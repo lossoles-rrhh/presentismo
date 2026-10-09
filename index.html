@@ -249,6 +249,7 @@
           <div id="serLista" class="lista" role="listbox"></div>
         </div>
         <div id="serElegido" class="elegido oculto"><span></span><button type="button">Cambiar</button></div>
+        <div id="serAviso" class="oculto"></div>
 
         <label for="fecha">Fecha <span class="ob">*</span></label>
         <input id="fecha" type="date">
@@ -360,7 +361,7 @@
 
 <script>
   var D = null;
-  var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null };
+  var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
   var CAMPOS = ['requerida', 'presente', 'francos', 'ausentes'];
 
@@ -531,6 +532,7 @@
     llamar('ingresar', S.nombre, clave).then(function (r) {
       if (!r.ok) { msg('loginMsg', r.mensaje); return; }
       S.clave = clave; S.nombre = r.nombre;
+      S.servicios = r.servicios || []; S.todos = !!r.todosLosServicios;   // solo los servicios de este supervisor
       try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
       $('hdrSup').textContent = r.nombre;
       $('usuarioBox').classList.remove('oculto');
@@ -545,7 +547,7 @@
   function salir() {
     if (sinGuardar && !confirm('Tenés un reporte sin enviar. ¿Salir igual?')) return;
     sinGuardar = false;
-    S = { clave: '', nombre: '', servicio: null, turno: null, dot: null };
+    S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false };
     $('clave').value = ''; $('hdrSup').textContent = '';
     $('usuarioBox').classList.add('oculto');
     bSup.cambiar();
@@ -554,8 +556,17 @@
 
   /* ---------- Formulario ---------- */
   function iniciarForm() {
+    // Lista de servicios del supervisor que ingresó (se arma de nuevo en cada ingreso)
+    bSer = buscador('ser', S.servicios, function (n) { S.servicio = n; cargarDot(); });
+    if (!S.servicios.length) {
+      msg('serAviso', 'No tenés servicios asignados. Avisá a RRHH para que te los asignen.');
+    } else if (S.todos) {
+      msg('serAviso', 'Todavía no tenés servicios asignados: se muestran todos. Elegí con cuidado el tuyo.', 'aviso');
+    } else {
+      msg('serAviso', S.servicios.length === 1 ? 'Tenés 1 servicio asignado.' : 'Tenés ' + S.servicios.length + ' servicios asignados.', 'ok');
+    }
+    $('serBuscar').placeholder = S.servicios.length > 8 ? 'Buscar servicio…' : 'Elegí tu servicio…';
     if (!formListo) {
-      bSer = buscador('ser', D.servicios, function (n) { S.servicio = n; cargarDot(); });
       var cont = $('turnos');
       D.turnos.forEach(function (tu) {
         var b = document.createElement('button'); b.type = 'button';
@@ -583,6 +594,7 @@
     }
     $('fecha').value = D.hoy;
     limpiar(true);
+    if (S.servicios.length === 1) bSer.elegir(S.servicios[0]);   // un solo servicio: se elige solo
     ver('vForm');
   }
 
