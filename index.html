@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Presentismo · Los Soles Internacional</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='9' fill='%23f2a900'/%3E%3Cg stroke='%23f2a900' stroke-width='3' stroke-linecap='round'%3E%3Cline x1='20' y1='2' x2='20' y2='7'/%3E%3Cline x1='20' y1='33' x2='20' y2='38'/%3E%3Cline x1='2' y1='20' x2='7' y2='20'/%3E%3Cline x1='33' y1='20' x2='38' y2='20'/%3E%3C/g%3E%3C/svg%3E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#1f4e79">
+<style>
+  /* ============================================================
+     PRESENTISMO · LOS SOLES — Interfaz del supervisor (v3.5 · página independiente)
+     Diseño "mobile first": pensado primero para el celular y
+     ampliado para PC (2 columnas desde 900 px de ancho).
+     ============================================================ */
+  :root {
+    --azul:#1f4e79; --azul2:#2e75b6; --azul-claro:#e8f1fb; --verde:#2e7d32; --rojo:#c62828; --ambar:#b26a00;
+    --gris:#f3f5f8; --borde:#d5dbe3; --texto:#1d2733; --suave:#5b6776;
+    --radio:12px; --toque:48px;            /* alto mínimo de botones e inputs (dedo) */
+    --pad:14px;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  body {
+    margin:0; min-height:100vh; min-height:100dvh;
+    font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif; font-size:16px; line-height:1.4;
+    background:var(--gris); color:var(--texto); overflow-x:hidden;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button, input, textarea { font:inherit; color:inherit; }
+  button, a.btn, .turnos button, .lista button { touch-action:manipulation; }
+
+  /* ---------- Encabezado ---------- */
+  header {
+    background:#fff; border-bottom:4px solid var(--azul); position:sticky; top:0; z-index:20;
+    padding:8px var(--pad); padding-top:max(8px, env(safe-area-inset-top));
+  }
+  .marca { max-width:1040px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .logo { display:flex; align-items:center; gap:8px; min-width:0; }
+  .logo img { max-height:44px; max-width:min(220px, 55vw); display:block; }
+  .logo svg { flex:0 0 auto; width:34px; height:34px; }
+  .logo .txt { min-width:0; }
+  .logo .txt b { display:block; color:var(--azul); font-size:14px; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .logo .txt span { display:block; color:var(--suave); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .usuario { display:flex; align-items:center; gap:8px; min-width:0; flex:0 1 auto; }
+  .usuario b { font-size:12px; color:var(--texto); max-width:34vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .salir { min-height:36px; padding:0 12px; background:#fff; border:1px solid var(--borde); color:var(--azul2); border-radius:8px; font-size:13px; cursor:pointer; flex:0 0 auto; }
+
+  /* ---------- Contenedor y tarjetas ---------- */
+  .wrap { width:100%; max-width:560px; margin:0 auto; padding:var(--pad); padding-bottom:calc(var(--pad) + env(safe-area-inset-bottom)); }
+  .wrap.angosto { max-width:460px; }
+  .card { background:#fff; border:1px solid var(--borde); border-radius:var(--radio); padding:var(--pad); margin-bottom:var(--pad); min-width:0; }
+  .card h2 { font-size:17px; margin:0 0 4px; color:var(--azul); }
+  .ayuda { margin:4px 0 0; font-size:13px; color:var(--suave); }
+  .grilla { display:block; }
+
+  /* ---------- Campos ---------- */
+  label { display:block; font-weight:600; font-size:14px; margin:14px 0 6px; }
+  label .ob { color:var(--rojo); font-weight:700; }
+  input, textarea {
+    width:100%; min-height:var(--toque); padding:12px; font-size:16px; /* 16px evita el zoom automático en iPhone */
+    border:1px solid var(--borde); border-radius:10px; background:#fff; -webkit-appearance:none; appearance:none;
+  }
+  input[type=date] { display:block; }
+  input:focus, textarea:focus { outline:2px solid var(--azul2); outline-offset:0; border-color:var(--azul2); }
+  input.mal, textarea.mal { border-color:var(--rojo); background:#fff7f7; }
+  textarea { min-height:110px; resize:vertical; }
+  .check { display:flex; align-items:center; gap:8px; font-weight:400; font-size:14px; margin-top:8px; min-height:32px; }
+  .check input { width:22px; height:22px; min-height:0; margin:0; -webkit-appearance:checkbox; appearance:auto; }
+
+  /* ---------- Botones ---------- */
+  .btn {
+    display:flex; align-items:center; justify-content:center; width:100%; min-height:52px; padding:12px 16px;
+    font-size:16px; font-weight:700; border:0; border-radius:12px; background:var(--azul2); color:#fff;
+    cursor:pointer; margin-top:14px; text-align:center; text-decoration:none;
+  }
+  .btn:active:not(:disabled) { transform:scale(.99); }
+  .btn:disabled { background:#a9b8c8; cursor:not-allowed; }
+  .btn.sec { background:#fff; color:var(--azul2); border:1px solid var(--azul2); }
+  .btn.ok { background:var(--verde); }
+  .btn.wa { background:#1fa855; margin-top:10px; }
+
+  /* ---------- Buscador (supervisor / servicio) ---------- */
+  .buscar { position:relative; }
+  .buscar input { padding-left:40px; }
+  .buscar::before { content:'🔍'; position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:16px; opacity:.7; pointer-events:none; }
+  .lista { max-height:min(44vh, 300px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+           border:1px solid var(--borde); border-radius:10px; margin-top:6px; background:#fff; }
+  .lista button { display:block; width:100%; min-height:var(--toque); text-align:left; padding:12px; border:0;
+                  border-bottom:1px solid #eef1f5; background:#fff; font-size:15px; cursor:pointer; overflow-wrap:anywhere; }
+  .lista button:last-child { border-bottom:0; }
+  .lista button:hover, .lista button:focus { background:var(--azul-claro); outline:none; }
+  .lista .vacio { padding:14px 12px; color:var(--suave); font-size:14px; }
+  .elegido { min-height:var(--toque); padding:10px 12px; background:var(--azul-claro); border:1px solid #bcd6f0; border-radius:10px;
+             font-weight:600; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .elegido span { min-width:0; overflow-wrap:anywhere; }
+  .elegido button { flex:0 0 auto; min-height:40px; padding:0 12px; background:#fff; border:1px solid #bcd6f0; border-radius:8px;
+                    color:var(--azul2); font-size:14px; cursor:pointer; }
+
+  /* ---------- Turnos ---------- */
+  .turnos { display:grid; grid-template-columns:repeat(auto-fit, minmax(128px, 1fr)); gap:8px; }
+  .turnos button { min-height:var(--toque); padding:10px 8px; border:1px solid var(--borde); border-radius:10px; background:#fff;
+                   font-size:15px; cursor:pointer; }
+  .turnos button.sel { background:var(--azul2); color:#fff; border-color:var(--azul2); font-weight:700; }
+
+  /* ---------- Dotación ---------- */
+  .kpis { display:grid; grid-template-columns:1fr 1.4fr; gap:8px; margin-top:10px; }
+  .kpi { background:var(--gris); border-radius:10px; padding:10px; text-align:center; min-width:0; }
+  .kpi b { display:block; font-size:26px; line-height:1.2; }
+  .kpi b.chico { font-size:14px; line-height:1.3; padding-top:6px; overflow-wrap:anywhere; }
+  .kpi span { font-size:12px; color:var(--suave); }
+
+  /* Campos numéricos con botones − / + (cómodos con el dedo) */
+  .numeros { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; }
+  .num label { margin-top:12px; }
+  .stepper { display:grid; grid-template-columns:var(--toque) minmax(0, 1fr) var(--toque); border:1px solid var(--borde); border-radius:10px; overflow:hidden; background:#fff; }
+  .stepper:focus-within { outline:2px solid var(--azul2); border-color:var(--azul2); }
+  .stepper.mal { border-color:var(--rojo); background:#fff7f7; }
+  .stepper button { min-height:var(--toque); border:0; background:var(--gris); font-size:22px; font-weight:700; color:var(--azul); cursor:pointer; }
+  .stepper button:active { background:#dfe6ee; }
+  .stepper input { border:0; border-radius:0; text-align:center; font-size:20px; font-weight:700; padding:8px 4px; min-width:0; background:transparent; }
+  .stepper input:focus { outline:none; }
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  input[type=number] { -moz-appearance:textfield; }
+
+  /* ---------- Controles y mensajes ---------- */
+  .control { margin-top:12px; padding:12px; border-radius:10px; font-size:15px; overflow-wrap:anywhere; }
+  .control b { font-size:16px; }
+  .control.ok { background:#e8f5e9; color:var(--verde); }
+  .control.mal { background:#ffebee; color:var(--rojo); border:1px solid #f5c2c2; }
+  .control.ambar { background:#fff4e0; color:var(--ambar); }
+  .control.neutro { background:var(--gris); color:var(--suave); }
+  .control small { display:block; margin-top:4px; font-size:14px; }
+  .msg { padding:12px; border-radius:10px; margin-top:12px; font-size:15px; overflow-wrap:anywhere; }
+  .msg.error { background:#ffebee; color:var(--rojo); }
+  .msg.ok { background:#e8f5e9; color:var(--verde); font-weight:600; }
+  .msg.aviso { background:#fff8e1; color:#8a6d00; }
+  .pend { margin:12px 0 0; padding:10px 12px 10px 28px; background:#fff8e1; border-radius:10px; color:#8a6d00; font-size:14px; }
+  .pend li { margin:3px 0; }
+  .contador { font-size:12px; color:var(--suave); text-align:right; margin-top:4px; min-height:16px; }
+  .oculto { display:none !important; }
+
+  /* Barra de acción fija abajo en el celular (el botón siempre a mano) */
+  .acciones { position:sticky; bottom:0; z-index:10; margin:var(--pad) calc(-1 * var(--pad)) calc(-1 * var(--pad));
+              padding:10px var(--pad) calc(10px + env(safe-area-inset-bottom)); background:rgba(255,255,255,.96);
+              border-top:1px solid var(--borde); border-radius:0 0 var(--radio) var(--radio); }
+  .acciones .btn { margin-top:0; }
+
+  /* ---------- Resumen (revisión / confirmación) ---------- */
+  .resumen { width:100%; border-collapse:collapse; margin-top:8px; }
+  .resumen td { padding:9px 4px; border-bottom:1px solid #eef1f5; font-size:15px; vertical-align:top; overflow-wrap:anywhere; }
+  .resumen td:first-child { color:var(--suave); width:44%; }
+  .cargando { text-align:center; padding:60px 0; color:var(--suave); }
+  .spinner { width:36px; height:36px; border:4px solid #d5dbe3; border-top-color:var(--azul2); border-radius:50%; margin:0 auto 12px; animation:gira .9s linear infinite; }
+  @keyframes gira { to { transform:rotate(360deg); } }
+
+  /* ---------- Celulares (≤ 420 px) ---------- */
+  @media (max-width:420px) {
+    :root { --pad:12px; }
+    .logo .txt span { display:none; }
+    .usuario b { display:none; }
+    .resumen td { display:block; width:auto !important; border-bottom:0; padding:2px 0; }
+    .resumen tr { display:block; padding:8px 0; border-bottom:1px solid #eef1f5; }
+    .resumen td:first-child { font-size:13px; }
+  }
+  /* ---------- Celulares muy angostos (≤ 340 px) ---------- */
+  @media (max-width:340px) {
+    .numeros, .kpis { grid-template-columns:1fr; }
+    .turnos { grid-template-columns:1fr 1fr; }
+  }
+
+  /* ---------- PC / tablet (≥ 900 px): 2 columnas ---------- */
+  @media (min-width:900px) {
+    :root { --pad:18px; }
+    .wrap { max-width:1040px; }
+    .wrap.angosto { max-width:460px; }
+    .grilla { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.1fr); gap:18px; align-items:start; }
+    .grilla .card { margin-bottom:0; }
+    .grilla .card.fija { position:sticky; top:84px; }
+    .acciones { position:static; margin:16px 0 0; padding:0; background:none; border:0; }
+    .vista-corta { max-width:640px; margin:0 auto; }
+    .usuario b { max-width:260px; font-size:13px; }
+    .logo .txt b { font-size:15px; }
+    .logo .txt span { font-size:12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="marca">
+    <div class="logo" id="logoBox">
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="8" fill="#f2a900"/>
+        <g stroke="#f2a900" stroke-width="3" stroke-linecap="round">
+          <line x1="20" y1="3" x2="20" y2="8"/><line x1="20" y1="32" x2="20" y2="37"/>
+          <line x1="3" y1="20" x2="8" y2="20"/><line x1="32" y1="20" x2="37" y2="20"/>
+          <line x1="8" y1="8" x2="11.5" y2="11.5"/><line x1="28.5" y1="28.5" x2="32" y2="32"/>
+          <line x1="8" y1="32" x2="11.5" y2="28.5"/><line x1="28.5" y1="11.5" x2="32" y2="8"/>
+        </g>
+      </svg>
+      <div class="txt"><b>Los Soles Internacional S.A.</b><span>Limpieza Integral y Mantenimiento</span></div>
+    </div>
+    <div class="usuario oculto" id="usuarioBox">
+      <b id="hdrSup"></b>
+      <button id="btnSalir" class="salir" type="button">Salir</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap" id="wrap">
+
+  <div id="vCargando" class="cargando"><div class="spinner"></div>Cargando…</div>
+
+  <!-- ================= INGRESO: NOMBRE + (PIN o DNI) ================= -->
+  <div id="vLogin" class="oculto">
+    <div class="card">
+      <h2>Ingreso de supervisor</h2>
+      <p class="ayuda">Buscá tu nombre y validá tu identidad con tu PIN de 4 dígitos o tu DNI.</p>
+
+      <label for="supBuscar">Tu nombre <span class="ob">*</span></label>
+      <div id="supCaja">
+        <div class="buscar"><input id="supBuscar" type="search" placeholder="Escribí tu apellido…" autocomplete="off" autocapitalize="characters" enterkeyhint="search"></div>
+        <div id="supLista" class="lista" role="listbox"></div>
+      </div>
+      <div id="supElegido" class="elegido oculto"><span></span><button type="button">Cambiar</button></div>
+
+      <label for="clave">PIN (4 dígitos) o DNI <span class="ob">*</span></label>
+      <input id="clave" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="10" placeholder="PIN o DNI, sin puntos" autocomplete="off" enterkeyhint="go">
+      <label class="check"><input id="verClave" type="checkbox"> Mostrar</label>
+
+      <div id="loginMsg" class="oculto"></div>
+      <button id="btnIngresar" class="btn" type="button">Ingresar</button>
+    </div>
+  </div>
+
+  <!-- ================= FORMULARIO ================= -->
+  <div id="vForm" class="oculto">
+    <div class="grilla">
+      <div class="card fija">
+        <h2>Reporte de presentismo</h2>
+
+        <label for="serBuscar">Servicio <span class="ob">*</span></label>
+        <div id="serCaja">
+          <div class="buscar"><input id="serBuscar" type="search" placeholder="Buscar servicio…" autocomplete="off" enterkeyhint="search"></div>
+          <div id="serLista" class="lista" role="listbox"></div>
+        </div>
+        <div id="serElegido" class="elegido oculto"><span></span><button type="button">Cambiar</button></div>
+
+        <label for="fecha">Fecha <span class="ob">*</span></label>
+        <input id="fecha" type="date">
+
+        <label>Turno <span class="ob">*</span></label>
+        <div id="turnos" class="turnos"></div>
+
+        <div id="sinDot" class="msg aviso">Elegí el servicio y el turno para cargar la dotación.</div>
+      </div>
+
+      <div id="dotCard" class="card oculto">
+        <h2>Dotación del turno</h2>
+        <div class="kpis">
+          <div class="kpi"><b id="dotCon">–</b><span>Contratada</span></div>
+          <div class="kpi"><b id="dotOp" class="chico">–</b><span>Responsable operativo</span></div>
+        </div>
+        <div id="manualBox" class="oculto">
+          <div id="manualMotivo" class="msg aviso"></div>
+          <div class="num">
+            <label for="contratadaManual">Dotación contratada del turno <span class="ob">*</span></label>
+            <div class="stepper">
+              <button type="button" data-paso="-1" data-campo="contratadaManual" aria-label="Restar">−</button>
+              <input id="contratadaManual" type="number" inputmode="numeric" pattern="[0-9]*" min="1" step="1" placeholder="—">
+              <button type="button" data-paso="1" data-campo="contratadaManual" aria-label="Sumar">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="numeros">
+          <div class="num">
+            <label for="requerida">Requeridos <span class="ob">*</span></label>
+            <div class="stepper">
+              <button type="button" data-paso="-1" data-campo="requerida" aria-label="Restar">−</button>
+              <input id="requerida" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="—" enterkeyhint="next">
+              <button type="button" data-paso="1" data-campo="requerida" aria-label="Sumar">+</button>
+            </div>
+          </div>
+          <div class="num">
+            <label for="presente">Presentes <span class="ob">*</span></label>
+            <div class="stepper">
+              <button type="button" data-paso="-1" data-campo="presente" aria-label="Restar">−</button>
+              <input id="presente" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="—" enterkeyhint="next">
+              <button type="button" data-paso="1" data-campo="presente" aria-label="Sumar">+</button>
+            </div>
+          </div>
+          <div class="num">
+            <label for="francos">Francos <span class="ob">*</span></label>
+            <div class="stepper">
+              <button type="button" data-paso="-1" data-campo="francos" aria-label="Restar">−</button>
+              <input id="francos" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="—" enterkeyhint="next">
+              <button type="button" data-paso="1" data-campo="francos" aria-label="Sumar">+</button>
+            </div>
+          </div>
+          <div class="num">
+            <label for="ausentes">Ausentes <span class="ob">*</span></label>
+            <div class="stepper">
+              <button type="button" data-paso="-1" data-campo="ausentes" aria-label="Restar">−</button>
+              <input id="ausentes" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="—" enterkeyhint="next">
+              <button type="button" data-paso="1" data-campo="ausentes" aria-label="Sumar">+</button>
+            </div>
+          </div>
+        </div>
+        <p class="ayuda">Si no hay francos o ausentes, cargá <b>0</b>. No se pueden dejar vacíos.</p>
+
+        <div id="ctrlSuma" class="control neutro"></div>
+        <div id="ctrlDif" class="control neutro"></div>
+
+        <label for="obs">Observaciones <span id="obsOb" class="ob oculto">* obligatorio</span></label>
+        <textarea id="obs" maxlength="1500" placeholder="Detallá ausencias (nombre y apellido, con o sin aviso), licencias médicas, coberturas, reemplazos, etc."></textarea>
+        <div id="obsCont" class="contador"></div>
+
+        <ul id="pendientes" class="pend oculto"></ul>
+        <div id="formMsg" class="oculto"></div>
+
+        <div class="acciones">
+          <button id="btnRevisar" class="btn" type="button" disabled>Revisar reporte</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= REVISIÓN ================= -->
+  <div id="vRevision" class="oculto">
+    <div class="card vista-corta">
+      <h2>Revisá antes de enviar</h2>
+      <table id="revTabla" class="resumen"></table>
+      <div id="revDup" class="msg aviso oculto"></div>
+      <div id="revMsg" class="oculto"></div>
+      <div class="acciones">
+        <button id="btnEnviar" class="btn ok" type="button">Confirmar y enviar reporte</button>
+        <button id="btnEditar" class="btn sec" type="button" style="margin-top:10px">Volver a editar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CONFIRMACIÓN ================= -->
+  <div id="vOk" class="oculto">
+    <div class="card vista-corta">
+      <div class="msg ok" style="margin-top:0">✅ Reporte guardado y enviado</div>
+      <table id="okTabla" class="resumen"></table>
+      <div id="okEmail" class="msg aviso"></div>
+      <div id="okWa"></div>
+      <button id="btnOtroTurno" class="btn" type="button">Reportar otro turno de este servicio</button>
+      <button id="btnOtroServicio" class="btn sec" type="button" style="margin-top:10px">Reportar otro servicio</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  var D = null;
+  var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null };
+  var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
+  var CAMPOS = ['requerida', 'presente', 'francos', 'ausentes'];
+
+  function $(id) { return document.getElementById(id); }
+  function ver(id) {
+    ['vCargando', 'vLogin', 'vForm', 'vRevision', 'vOk'].forEach(function (v) { $(v).classList.toggle('oculto', v !== id); });
+    $('wrap').classList.toggle('angosto', id === 'vLogin');
+    window.scrollTo(0, 0);
+  }
+  function msg(id, texto, tipo) {
+    var el = $(id);
+    if (!texto) { el.className = 'oculto'; el.textContent = ''; return; }
+    el.className = 'msg ' + (tipo || 'error'); el.textContent = texto;
+  }
+  /* ------------------------------------------------------------
+     Conexión con la planilla (Apps Script).
+     Si alguna vez se publica una implementación NUEVA (link nuevo),
+     solo hay que reemplazar esta dirección.
+     ------------------------------------------------------------ */
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxgWVe0MhR5IwxFTqwryn35dTiU2JnMuoXiqYbd7tu51uIM6T8-hMZyWEPYH3Bdg73Y8A/exec';
+  var SOLO_LECTURA = { obtenerDatosIniciales: 1, obtenerLogo: 1, obtenerDotacion: 1, verificarDuplicado: 1 };
+
+  function llamar(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    var intentos = SOLO_LECTURA[fn] ? 2 : 1;          // las consultas se reintentan; el envío del reporte NO (evita duplicados)
+    function pedir(restan) {
+      var ctrl = ('AbortController' in window) ? new AbortController() : null;
+      var corte = setTimeout(function () { if (ctrl) ctrl.abort(); }, 45000);
+      return fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // evita el "preflight" CORS
+        body: JSON.stringify({ accion: fn, args: args }),
+        redirect: 'follow',
+        credentials: 'omit',                                      // no usa las cuentas de Google del teléfono
+        signal: ctrl ? ctrl.signal : undefined
+      }).then(function (r) {
+        clearTimeout(corte);
+        if (!r.ok) throw new Error('El servidor respondió ' + r.status);
+        return r.json();
+      }).then(function (j) {
+        if (!j || !j.ok) throw new Error((j && j.error) || 'Respuesta inválida del servidor');
+        return j.data;
+      }).catch(function (e) {
+        clearTimeout(corte);
+        if (e && e.name === 'AbortError') e = new Error('La conexión tardó demasiado');
+        if (restan > 1 && !/servidor respondió|Acción/.test(e.message)) return pedir(restan - 1);
+        throw e;
+      });
+    }
+    return pedir(intentos);
+  }
+  function sinAcentos(t) { return String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase(); }
+  function fmt(n) { return String(Math.round(Number(n) * 100) / 100).replace('.', ','); }
+  function errorTexto(e) { return (e && e.message) ? e.message : String(e); }
+  function fechaLinda(iso) { var p = String(iso).split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso; }
+  function entero(id) { var v = $(id).value.trim(); return /^\d{1,3}$/.test(v) ? Number(v) : null; }
+  function esCelular() { return window.matchMedia('(max-width: 899px)').matches; }
+
+  /* Buscador filtrable (lista grande, fácil de tocar) */
+  function buscador(prefijo, items, alElegir) {
+    var inp = $(prefijo + 'Buscar'), lista = $(prefijo + 'Lista'), eleg = $(prefijo + 'Elegido'), caja = $(prefijo + 'Caja');
+    function pintar() {
+      var q = sinAcentos(inp.value.trim()).split(/\s+/).filter(Boolean);
+      var res = items.filter(function (it) {
+        var n = sinAcentos(it);
+        return q.every(function (p) { return n.indexOf(p) >= 0; });
+      }).slice(0, 80);
+      lista.innerHTML = '';
+      if (!res.length) { var d = document.createElement('div'); d.className = 'vacio'; d.textContent = 'Sin resultados'; lista.appendChild(d); return; }
+      res.forEach(function (it) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = it; b.setAttribute('role', 'option');
+        b.onclick = function () { elegir(it); };
+        lista.appendChild(b);
+      });
+    }
+    function elegir(it) {
+      caja.classList.add('oculto'); eleg.classList.remove('oculto');
+      eleg.querySelector('span').textContent = it;
+      inp.blur();                                   // cierra el teclado del celular
+      alElegir(it);
+    }
+    function cambiar() { eleg.classList.add('oculto'); caja.classList.remove('oculto'); inp.value = ''; pintar(); alElegir(null); }
+    inp.oninput = pintar;
+    inp.onkeydown = function (e) {                  // Enter elige el primer resultado
+      if (e.key === 'Enter') { var p = lista.querySelector('button'); if (p) { e.preventDefault(); p.click(); } }
+    };
+    eleg.querySelector('button').onclick = function () { cambiar(); inp.focus(); };
+    pintar();
+    return { elegir: elegir, cambiar: cambiar };
+  }
+
+  /* Botones − / + de los campos numéricos */
+  function iniciarSteppers() {
+    Array.prototype.forEach.call(document.querySelectorAll('.stepper button'), function (b) {
+      b.onclick = function () {
+        var inp = $(b.getAttribute('data-campo'));
+        var min = Number(inp.getAttribute('min') || 0);
+        var paso = Number(b.getAttribute('data-paso'));
+        var actual = inp.value.trim();
+        // Campo vacío: "+" pone 1 y "−" pone el mínimo (0). Con número: suma o resta 1.
+        inp.value = /^\d+$/.test(actual)
+          ? Math.min(999, Math.max(min, Number(actual) + paso))
+          : (paso > 0 ? Math.max(min, 1) : min);
+        validar();
+      };
+    });
+    // "Siguiente" del teclado del celular pasa al próximo campo
+    var orden = ['requerida', 'presente', 'francos', 'ausentes', 'obs'];
+    orden.slice(0, -1).forEach(function (id, i) {
+      $(id).onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $(orden[i + 1]).focus(); } };
+    });
+  }
+
+  /* ---------- Inicio ---------- */
+  window.onload = function () {
+    llamar('obtenerLogo').then(function (uri) {
+      if (!uri) return;
+      var box = $('logoBox'); box.innerHTML = '';
+      var img = document.createElement('img'); img.src = uri; img.alt = 'Los Soles Internacional S.A. - Limpieza Integral y Mantenimiento';
+      box.appendChild(img);
+    }).catch(function () {});
+
+    llamar('obtenerDatosIniciales').then(function (d) {
+      D = d;
+      iniciarLogin();
+    }).catch(function (e) {
+      $('vCargando').innerHTML = '';
+      var m = document.createElement('div'); m.className = 'msg error';
+      m.textContent = 'No se pudo cargar el formulario: ' + errorTexto(e) + '. Revisá tu conexión y recargá la página.';
+      $('vCargando').appendChild(m);
+    });
+
+    // Aviso si se intenta cerrar o recargar con un reporte a medio cargar
+    window.addEventListener('beforeunload', function (e) {
+      if (sinGuardar) { e.preventDefault(); e.returnValue = ''; }
+    });
+  };
+
+  /* ---------- Ingreso: nombre + (PIN o DNI) ---------- */
+  function iniciarLogin() {
+    bSup = buscador('sup', D.supervisores, function (n) {
+      S.nombre = n || '';
+      $('clave').value = '';
+      msg('loginMsg');
+      if (n && !esCelular()) $('clave').focus();
+    });
+    try {
+      var u = localStorage.getItem('ultimoSupervisor');
+      if (u && D.supervisores.indexOf(u) >= 0) bSup.elegir(u);
+    } catch (e) {}
+    $('btnIngresar').onclick = ingresar;
+    $('clave').onkeydown = function (e) { if (e.key === 'Enter') ingresar(); };
+    $('clave').oninput = function () { this.value = this.value.replace(/\D/g, ''); };
+    $('verClave').onchange = function () { $('clave').type = this.checked ? 'text' : 'password'; };
+    $('btnSalir').onclick = salir;
+    ver('vLogin');
+  }
+
+  function ingresar() {
+    var clave = $('clave').value.replace(/\D/g, '');
+    if (!S.nombre) { msg('loginMsg', 'Buscá y elegí tu nombre de la lista.'); return; }
+    if (!clave) { msg('loginMsg', 'Ingresá tu PIN de 4 dígitos o tu DNI.'); return; }
+    if (clave.length !== 4 && (clave.length < 6 || clave.length > 9)) {
+      msg('loginMsg', 'El PIN tiene 4 dígitos y el DNI entre 7 y 8 (sin puntos).'); return;
+    }
+    $('clave').blur();
+    var btn = $('btnIngresar'); btn.disabled = true; btn.textContent = 'Verificando…';
+    llamar('ingresar', S.nombre, clave).then(function (r) {
+      if (!r.ok) { msg('loginMsg', r.mensaje); return; }
+      S.clave = clave; S.nombre = r.nombre;
+      try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
+      $('hdrSup').textContent = r.nombre;
+      $('usuarioBox').classList.remove('oculto');
+      $('clave').value = '';
+      msg('loginMsg');
+      iniciarForm();
+    }).catch(function (e) {
+      msg('loginMsg', 'Error de conexión: ' + errorTexto(e));
+    }).then(function () { btn.disabled = false; btn.textContent = 'Ingresar'; });
+  }
+
+  function salir() {
+    if (sinGuardar && !confirm('Tenés un reporte sin enviar. ¿Salir igual?')) return;
+    sinGuardar = false;
+    S = { clave: '', nombre: '', servicio: null, turno: null, dot: null };
+    $('clave').value = ''; $('hdrSup').textContent = '';
+    $('usuarioBox').classList.add('oculto');
+    bSup.cambiar();
+    ver('vLogin');
+  }
+
+  /* ---------- Formulario ---------- */
+  function iniciarForm() {
+    if (!formListo) {
+      bSer = buscador('ser', D.servicios, function (n) { S.servicio = n; cargarDot(); });
+      var cont = $('turnos');
+      D.turnos.forEach(function (tu) {
+        var b = document.createElement('button'); b.type = 'button';
+        b.textContent = (tu.emoji ? tu.emoji + ' ' : '') + tu.nombre;
+        b.onclick = function () {
+          Array.prototype.forEach.call(cont.children, function (x) { x.classList.remove('sel'); });
+          b.classList.add('sel'); S.turno = tu.nombre; cargarDot();
+        };
+        cont.appendChild(b);
+      });
+      iniciarSteppers();
+      CAMPOS.concat(['contratadaManual']).forEach(function (id) {
+        $(id).oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 3); validar(); };
+      });
+      $('obs').oninput = validar;
+      $('fecha').oninput = validar;
+      $('fecha').onchange = validar;
+      $('fecha').max = D.hoy; $('fecha').min = D.fechaMin;
+      $('btnRevisar').onclick = revisar;
+      $('btnEditar').onclick = function () { ver('vForm'); };
+      $('btnEnviar').onclick = enviar;
+      $('btnOtroTurno').onclick = function () { limpiar(false); ver('vForm'); };
+      $('btnOtroServicio').onclick = function () { limpiar(true); ver('vForm'); };
+      formListo = true;
+    }
+    $('fecha').value = D.hoy;
+    limpiar(true);
+    ver('vForm');
+  }
+
+  function limpiar(tambienServicio) {
+    if (tambienServicio) { bSer.cambiar(); S.servicio = null; }
+    S.turno = null; S.dot = null;
+    Array.prototype.forEach.call($('turnos').children, function (x) { x.classList.remove('sel'); });
+    CAMPOS.concat(['contratadaManual', 'obs']).forEach(function (id) { $(id).value = ''; $(id).classList.remove('mal'); });
+    $('dotCard').classList.add('oculto');
+    $('sinDot').classList.remove('oculto');
+    msg('formMsg'); validar();
+    sinGuardar = false;
+  }
+
+  function cargarDot() {
+    S.dot = null; validar();
+    if (!S.servicio || !S.turno) { $('dotCard').classList.add('oculto'); $('sinDot').classList.remove('oculto'); return; }
+    $('sinDot').classList.add('oculto');
+    $('dotCard').classList.remove('oculto');
+    $('dotCon').textContent = '…'; $('dotOp').textContent = '…';
+    $('manualBox').classList.add('oculto');
+    var n = ++pedidoDot;
+    llamar('obtenerDotacion', S.servicio, S.turno).then(function (r) {
+      if (n !== pedidoDot) return;
+      S.dot = r;
+      $('dotOp').textContent = r.respOperativo || 'Sin asignar';
+      if (r.encontrada) {
+        $('dotCon').textContent = fmt(r.contratada) + (r.contratadaEntera !== r.contratada ? ' (' + r.contratadaEntera + ' pers.)' : '');
+      } else {
+        $('dotCon').textContent = '?';
+        $('manualMotivo').textContent = (r.motivo || 'No hay dotación contratada cargada.') + ' Cargala a mano para poder continuar.';
+        $('manualBox').classList.remove('oculto');
+      }
+      validar();
+      if (esCelular()) $('dotCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }).catch(function (e) {
+      if (n !== pedidoDot) return;
+      $('dotCon').textContent = '–'; $('dotOp').textContent = '–';
+      msg('formMsg', 'No se pudo leer la dotación: ' + errorTexto(e));
+    });
+  }
+
+  function contratadaActual() {
+    if (!S.dot) return null;
+    if (S.dot.encontrada) return S.dot.contratadaEntera;
+    var m = entero('contratadaManual');
+    return m && m > 0 ? m : null;
+  }
+
+  /** Validación estricta en vivo. Habilita "Revisar" solo si todo cierra. */
+  function validar() {
+    var pend = [];
+    if (!S.servicio) pend.push('Elegí el servicio.');
+    var f = $('fecha').value;
+    if (!f) pend.push('Elegí la fecha.');
+    else if (f > D.hoy) pend.push('La fecha no puede ser futura.');
+    else if (f < D.fechaMin) pend.push('La fecha es demasiado antigua (máximo ' + D.fechaMin.split('-').reverse().join('/') + ').');
+    if (!S.turno) pend.push('Elegí el turno.');
+
+    var c = contratadaActual();
+    if (S.dot && !S.dot.encontrada && c === null) pend.push('Cargá la dotación contratada del turno.');
+
+    var v = {}, faltan = [];
+    var nombres = { requerida: 'Requeridos', presente: 'Presentes', francos: 'Francos', ausentes: 'Ausentes' };
+    CAMPOS.forEach(function (k) {
+      v[k] = entero(k);
+      var vacio = $(k).value.trim() === '';
+      $(k).parentNode.classList.toggle('mal', !vacio && v[k] === null);
+      if (v[k] === null) faltan.push(nombres[k]);
+    });
+    if (S.dot && faltan.length) pend.push('Completá: ' + faltan.join(', ') + ' (0 si no hay).');
+
+    // Control de suma: Presentes + Francos + Ausentes = Contratada
+    var cs = $('ctrlSuma'), sumaOk = false;
+    if (c !== null && v.presente !== null && v.francos !== null && v.ausentes !== null) {
+      var suma = v.presente + v.francos + v.ausentes;
+      sumaOk = suma === c;
+      cs.className = 'control ' + (sumaOk ? 'ok' : 'mal');
+      cs.innerHTML = '';
+      var b = document.createElement('b');
+      b.textContent = (sumaOk ? '✔ ' : '✖ ') + 'Presentes + Francos + Ausentes = ' + suma + ' de ' + c + ' contratados';
+      cs.appendChild(b);
+      if (!sumaOk) {
+        var s = document.createElement('small');
+        s.textContent = suma < c ? 'Faltan ' + (c - suma) + ' persona(s) por detallar.' : 'Sobran ' + (suma - c) + ': revisá los números.';
+        cs.appendChild(s);
+        pend.push('La suma debe dar exactamente ' + c + '.');
+      }
+    } else {
+      cs.className = 'control neutro';
+      cs.textContent = 'Control: Presentes + Francos + Ausentes debe ser igual a la dotación contratada.';
+    }
+
+    // Diferencia: Presentes − Requeridos
+    var cd = $('ctrlDif'), dif = null;
+    if (v.presente !== null && v.requerida !== null) {
+      dif = v.presente - v.requerida;
+      cd.innerHTML = '';
+      var bd = document.createElement('b');
+      bd.textContent = 'Diferencia (Presentes − Requeridos): ' + (dif > 0 ? '+' : '') + dif;
+      cd.appendChild(bd);
+      var sd = document.createElement('small');
+      if (dif < 0) { cd.className = 'control mal'; sd.textContent = '⚠️ Faltan ' + (-dif) + ' persona(s) para cubrir lo requerido. Justificá la diferencia en Observaciones (quién faltó, licencias, coberturas).'; }
+      else if (dif > 0) { cd.className = 'control ambar'; sd.textContent = 'Hay más presentes que requeridos. Explicá el motivo en Observaciones.'; }
+      else { cd.className = 'control ok'; sd.textContent = 'Sin diferencia.'; }
+      cd.appendChild(sd);
+    } else {
+      cd.className = 'control neutro'; cd.textContent = 'Diferencia: se calcula al cargar Requeridos y Presentes.';
+    }
+
+    // Observaciones obligatorias si hay diferencia o ausentes
+    var obsReq = (dif !== null && dif !== 0) || (v.ausentes !== null && v.ausentes > 0);
+    var largo = $('obs').value.trim().length;
+    $('obsOb').classList.toggle('oculto', !obsReq);
+    $('obs').classList.toggle('mal', obsReq && largo < D.obsMin);
+    $('obsCont').textContent = obsReq ? (largo < D.obsMin ? 'Mínimo ' + D.obsMin + ' caracteres (' + largo + ')' : '✔') : '';
+    if (obsReq && largo < D.obsMin) pend.push('Justificá en Observaciones (mínimo ' + D.obsMin + ' caracteres).');
+
+    var ul = $('pendientes'); ul.innerHTML = '';
+    pend.forEach(function (p) { var li = document.createElement('li'); li.textContent = p; ul.appendChild(li); });
+    ul.classList.toggle('oculto', !pend.length || !S.dot);
+    $('btnRevisar').disabled = pend.length > 0;
+    $('btnRevisar').textContent = pend.length && S.dot ? 'Revisar reporte (' + pend.length + ' pendiente' + (pend.length > 1 ? 's' : '') + ')' : 'Revisar reporte';
+
+    sinGuardar = !!(S.servicio || CAMPOS.some(function (k) { return $(k).value; }) || $('obs').value);
+    ultimoEstado = { ok: !pend.length, v: v, contratada: c, dif: dif };
+    return ultimoEstado;
+  }
+
+  function filasResumen(x) {
+    return [
+      ['Servicio', x.servicio],
+      ['Fecha', x.fechaLinda],
+      ['Turno', (x.emoji ? x.emoji + ' ' : '') + x.turno],
+      ['Responsable operativo', x.respOperativo || 'Sin asignar'],
+      ['Dotación contratada', fmt(x.contratada)],
+      ['Requeridos', x.requerida],
+      ['Presentes', x.presente],
+      ['Francos', x.francos],
+      ['Ausentes', x.ausentes],
+      ['Diferencia', (x.diferencia > 0 ? '+' : '') + x.diferencia],
+      ['Observaciones', x.observaciones || '—']
+    ];
+  }
+
+  function pintarTabla(id, filas, dif) {
+    var t = $(id); t.innerHTML = '';
+    filas.forEach(function (f) {
+      var tr = document.createElement('tr');
+      var a = document.createElement('td'); a.textContent = f[0];
+      var b = document.createElement('td'); b.textContent = String(f[1]);
+      if (f[0] === 'Diferencia') { b.style.fontWeight = '700'; b.style.color = dif < 0 ? '#c62828' : (dif > 0 ? '#b26a00' : '#2e7d32'); }
+      tr.appendChild(a); tr.appendChild(b); t.appendChild(tr);
+    });
+  }
+
+  function datosActuales() {
+    var e = validar();
+    var turno = D.turnos.filter(function (t) { return t.nombre === S.turno; })[0] || {};
+    return {
+      envio: {
+        supervisor: S.nombre, clave: S.clave, servicio: S.servicio, turno: S.turno, fecha: $('fecha').value,
+        requerida: $('requerida').value.trim(), presente: $('presente').value.trim(),
+        francos: $('francos').value.trim(), ausentes: $('ausentes').value.trim(),
+        contratadaManual: $('contratadaManual').value.trim(), observaciones: $('obs').value.trim()
+      },
+      vista: {
+        servicio: S.servicio, fechaLinda: fechaLinda($('fecha').value), turno: S.turno, emoji: turno.emoji,
+        respOperativo: S.dot ? S.dot.respOperativo : '', contratada: S.dot && S.dot.encontrada ? S.dot.contratada : e.contratada,
+        requerida: e.v.requerida, presente: e.v.presente, francos: e.v.francos, ausentes: e.v.ausentes,
+        diferencia: e.dif, observaciones: $('obs').value.trim()
+      },
+      ok: e.ok
+    };
+  }
+
+  function revisar() {
+    var d = datosActuales();
+    if (!d.ok) return;
+    pintarTabla('revTabla', filasResumen(d.vista), d.vista.diferencia);
+    msg('revMsg'); $('revDup').classList.add('oculto');
+    ver('vRevision');
+    llamar('verificarDuplicado', d.envio.servicio, d.envio.fecha, d.envio.turno).then(function (n) {
+      if (n > 0) {
+        $('revDup').textContent = '⚠️ Ya hay ' + n + ' reporte(s) de este servicio y turno para esa fecha. Si confirmás, se guarda como un reporte adicional (por ejemplo, una corrección).';
+        $('revDup').classList.remove('oculto');
+      }
+    }).catch(function () {});
+  }
+
+  function enviar() {
+    var d = datosActuales();
+    if (!d.ok) { ver('vForm'); return; }
+    var btn = $('btnEnviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+    $('btnEditar').disabled = true;
+    llamar('guardarRegistro', d.envio).then(function (r) {
+      if (!r.ok) {
+        msg('revMsg', r.mensaje);
+        if (r.relogin) setTimeout(function () { sinGuardar = false; salir(); }, 2500);
+        return;
+      }
+      sinGuardar = false;
+      pintarTabla('okTabla', filasResumen(r.resumen), r.resumen.diferencia);
+      $('okEmail').textContent = '📧 ' + String(r.email).replace(/(contacto\(s\)):.*$/, '$1');   // en pantalla solo la cantidad de contactos
+      var wa = $('okWa'); wa.innerHTML = '';
+      (r.whatsapp || []).forEach(function (w) {
+        var a = document.createElement('a');
+        a.href = w.url; a.target = '_blank'; a.rel = 'noopener'; a.className = 'btn wa';
+        a.textContent = '💬 Enviar por WhatsApp a ' + w.nombre;
+        wa.appendChild(a);
+      });
+      ver('vOk');
+    }).catch(function (e) {
+      msg('revMsg', 'Error de conexión: ' + errorTexto(e) + '. Puede que el reporte no se haya guardado: avisá a RRHH antes de reenviarlo para no duplicarlo.');
+    }).then(function () {
+      btn.disabled = false; btn.textContent = 'Confirmar y enviar reporte';
+      $('btnEditar').disabled = false;
+    });
+  }
+</script>
+</body>
+</html>
