@@ -458,8 +458,9 @@
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
   var BASE = ['requerida', 'presente', 'francos'];
   var DESGLOSE = ['ausentes', 'enfermedad', 'art', 'licencias', 'sobrantes', 'ausentes3'];
-  var MOTIVOS_DEF = ['Evento', 'Capacitación', 'Solapamiento por alta/baja', 'Refuerzo autorizado por Operaciones/RRHH', 'Otro'];
+  var MOTIVOS_DEF = ['Evento / Limpieza de obra', 'Capacitación', 'Solapamiento por alta/baja', 'Refuerzo autorizado por Operaciones/RRHH', 'Otro'];
   var ROLES_DEF = ['Supervisor', 'Referente', 'Coordinador'];
+  var NO_COMPENSAN_DEF = ['Evento / Limpieza de obra'];   // sobrante para tarea específica: no cubre ausencias
 
   function $(id) { return document.getElementById(id); }
   function ver(id) {
@@ -603,6 +604,7 @@
       D = d;
       if (!D.motivosSobrante || !D.motivosSobrante.length) D.motivosSobrante = MOTIVOS_DEF;
       if (!D.rolesFirma || !D.rolesFirma.length) D.rolesFirma = ROLES_DEF;
+      if (!D.motivosNoCompensan) D.motivosNoCompensan = NO_COMPENSAN_DEF;
       iniciarLogin();
     }).catch(function (e) {
       $('vCargando').innerHTML = '';
@@ -837,7 +839,7 @@
     $('novBox').classList.toggle('oculto', dif !== 0);
     var activo = dif !== null && (dif !== 0 || $('conNovedades').checked);
     $('desglose').classList.toggle('oculto', !activo);
-    var g = { ausentes: 0, enfermedad: 0, art: 0, licencias: 0, sobrantes: 0, ausentes3: 0 };
+    var g = { ausentes: 0, enfermedad: 0, art: 0, licencias: 0, sobrantes: 0, ausentes3: 0, compensados: 0, faltanteReal: 0 };
     var faltantes = 0;
     if (activo) {
       var malos = false;
@@ -866,11 +868,17 @@
           (-fuera) + ' ausencia(s) quedaron cubiertas: cargá en Sobrantes quién las cubrió.');
         pend.push('Indicá en Sobrantes quién cubrió las ausencias.');
       } else {
+        // Compensación: salvo "Evento / Limpieza de obra" (tarea específica), los sobrantes cubren a los faltantes
+        var compensan = g.sobrantes > 0 && !!S.motivo && D.motivosNoCompensan.indexOf(S.motivo) < 0;
+        g.compensados = compensan ? Math.min(faltantes, g.sobrantes) : 0;
+        g.faltanteReal = faltantes - g.compensados;
         var det = 'Faltantes ' + faltantes + ' · Diferencia ' + conSigno(dif);
-        if (g.sobrantes) det += ' · Sobrantes ' + g.sobrantes + ': ' +
-          (cubren ? cubren + ' cubren ausencias dentro de los presentes' : '') + (cubren && fuera ? ' y ' : '') +
-          (fuera ? fuera + ' afectado(s) a ' + (S.motivo || 'otra tarea (elegí el motivo)') : '');
-        pintarControl('ctrlDesglose', 'ok', '✔ El desglose explica la diferencia (' + conSigno(dif) + ')', det);
+        if (g.sobrantes && !S.motivo) det += ' · Elegí el motivo de los sobrantes para saber si cubren las ausencias.';
+        else if (g.sobrantes && !compensan && faltantes) det += ' · Los ' + g.sobrantes + ' sobrante(s) están para ' + S.motivo + ': no cubren ausencias.';
+        else if (g.compensados) det += ' · ' + g.compensados + ' ausencia(s) cubierta(s) por sobrantes (' + S.motivo + ').';
+        if (faltantes) det += '  →  FALTANTE REAL (sin cubrir): ' + g.faltanteReal;
+        pintarControl('ctrlDesglose', g.faltanteReal > 0 ? 'ambar' : 'ok',
+          '✔ El desglose explica la diferencia (' + conSigno(dif) + ')' + (faltantes ? (g.faltanteReal ? ' · faltan ' + g.faltanteReal + ' sin cubrir' : ' · ausencias cubiertas') : ''), det);
       }
       // Alerta de ausencia prolongada
       $('ausentes3').parentNode.classList.toggle('mal', g.ausentes3 > g.ausentes);
@@ -930,6 +938,7 @@
       filas.push(['ART / Accidente', x.art]);
       filas.push(['Lic. especial / Vacaciones', x.licencias]);
       filas.push(['Sobrantes / Supernumerales', x.sobrantes + (x.sobrantes && x.motivoSobrante ? ' · ' + x.motivoSobrante : '')]);
+      if (x.ausentes || x.enfermedad || x.art || x.licencias) filas.push(['Faltante real (sin cubrir)', x.faltanteReal + (x.compensados ? '  (' + x.compensados + ' cubierto' + (x.compensados > 1 ? 's' : '') + ' por sobrantes)' : '')]);
     } else {
       filas.push(['Novedades', 'Sin novedades']);
     }
@@ -944,6 +953,7 @@
       var tr = document.createElement('tr');
       var a = document.createElement('td'); a.textContent = f[0];
       var b = document.createElement('td'); b.textContent = String(f[1]);
+      if (f[0] === 'Faltante real (sin cubrir)') { b.style.fontWeight = '700'; b.style.color = /^0/.test(String(f[1])) ? '#2e7d32' : '#c62828'; }
       if (f[0] === 'Diferencia / Faltantes') { b.style.fontWeight = '700'; b.style.color = dif > 0 ? '#c62828' : (dif < 0 ? '#b26a00' : '#2e7d32'); }
       tr.appendChild(a); tr.appendChild(b); t.appendChild(tr);
     });
@@ -970,6 +980,7 @@
         requerida: e.v.requerida, presente: e.v.presente, francos: e.v.francos, diferencia: e.dif,
         ausentes: e.activo ? g.ausentes : 0, enfermedad: e.activo ? g.enfermedad : 0, art: e.activo ? g.art : 0,
         licencias: e.activo ? g.licencias : 0, sobrantes: e.activo ? g.sobrantes : 0, ausentes3: e.activo ? g.ausentes3 : 0,
+        compensados: e.activo ? g.compensados : 0, faltanteReal: e.activo ? g.faltanteReal : 0,
         motivoSobrante: S.motivo, observaciones: $('obs').value.trim(), responsable: responsable
       },
       ok: e.ok
