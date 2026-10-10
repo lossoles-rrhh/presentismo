@@ -850,16 +850,27 @@
       $('sub3').classList.toggle('oculto', g.ausentes === 0);
       if (g.ausentes === 0) g.ausentes3 = 0;
       faltantes = g.ausentes + g.enfermedad + g.art + g.licencias;
-      var neto = faltantes - g.sobrantes;
-      if (neto === dif) {
-        pintarControl('ctrlDesglose', 'ok', '✔ El desglose explica la diferencia (' + conSigno(dif) + ')',
-          'Faltantes ' + faltantes + (g.sobrantes ? ' − Sobrantes ' + g.sobrantes : '') + ' = ' + neto);
+      // Sobrantes que cubren ausencias (están dentro de los presentes) = Faltantes − Diferencia.
+      // El resto de los sobrantes está afectado a otra cosa (evento, capacitación…) y solo se informa.
+      var cubren = faltantes - dif, fuera = g.sobrantes - cubren;
+      if (cubren < 0) {
+        pintarControl('ctrlDesglose', 'mal', '✖ Desglose: ' + faltantes + ' de ' + conSigno(dif),
+          dif > 0 ? 'Falta explicar ' + (-cubren) + ' persona(s): sumá ausentes, enfermedad, ART o licencias.'
+                  : 'Hay ' + (-dif) + ' persona(s) de más: cargalas como sobrantes.');
+        pend.push(dif > 0 ? 'Explicá las ' + dif + ' persona(s) que faltan en el desglose.' : 'Cargá los ' + (-dif) + ' presentes de más como sobrantes.');
+      } else if (fuera < 0 && faltantes === 0) {
+        pintarControl('ctrlDesglose', 'mal', '✖ Hay ' + (-dif) + ' persona(s) de más', 'Cargalas como sobrantes / supernumerales y elegí el motivo.');
+        pend.push('Cargá los ' + (-dif) + ' presentes de más como sobrantes.');
+      } else if (fuera < 0) {
+        pintarControl('ctrlDesglose', 'mal', '✖ Hay ' + faltantes + ' faltante(s) pero la diferencia es ' + conSigno(dif),
+          (-fuera) + ' ausencia(s) quedaron cubiertas: cargá en Sobrantes quién las cubrió.');
+        pend.push('Indicá en Sobrantes quién cubrió las ausencias.');
       } else {
-        var resta = dif - neto;
-        pintarControl('ctrlDesglose', 'mal', '✖ Desglose: ' + neto + ' de ' + conSigno(dif),
-          resta > 0 ? 'Falta explicar ' + resta + ' persona(s): sumá ausentes, enfermedad, ART o licencias.'
-                    : 'Sobran ' + (-resta) + ' en el desglose: revisá los números o cargá sobrantes.');
-        pend.push('El desglose (faltantes − sobrantes) debe dar exactamente ' + dif + '.');
+        var det = 'Faltantes ' + faltantes + ' · Diferencia ' + conSigno(dif);
+        if (g.sobrantes) det += ' · Sobrantes ' + g.sobrantes + ': ' +
+          (cubren ? cubren + ' cubren ausencias dentro de los presentes' : '') + (cubren && fuera ? ' y ' : '') +
+          (fuera ? fuera + ' afectado(s) a ' + (S.motivo || 'otra tarea (elegí el motivo)') : '');
+        pintarControl('ctrlDesglose', 'ok', '✔ El desglose explica la diferencia (' + conSigno(dif) + ')', det);
       }
       // Alerta de ausencia prolongada
       $('ausentes3').parentNode.classList.toggle('mal', g.ausentes3 > g.ausentes);
