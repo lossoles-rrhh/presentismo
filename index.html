@@ -340,7 +340,7 @@
 
         <!-- Desglose obligatorio cuando la diferencia no es 0 -->
         <div id="desglose" class="desglose oculto">
-          <h3>Desglose de novedades <span class="ob">*</span></h3>
+          <h3 id="tituloA">Desglose de novedades <span class="ob">*</span></h3>
           <p class="ayuda">Explicá la diferencia. Lo que no completes cuenta como 0.</p>
           <div class="numeros">
             <div class="num">
@@ -398,6 +398,47 @@
             <div id="motivos" class="chips"></div>
           </div>
           <div id="ctrlDesglose" class="control neutro"></div>
+        </div>
+
+        <!-- Bloque B: personal del contrato que no está de franco ni requerido -->
+        <div id="desgloseB" class="desglose oculto">
+          <h3 id="tituloB">No están de franco ni requeridos <span class="ob">*</span></h3>
+          <p class="ayuda">Contratados − Requeridos − Francos. Indicá dónde está cada una de estas personas.</p>
+          <div class="numeros">
+            <div class="num">
+              <label for="ubVacante">Vacante sin cubrir</label>
+              <div class="stepper">
+                <button type="button" data-paso="-1" data-campo="ubVacante" aria-label="Restar">−</button>
+                <input id="ubVacante" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0" enterkeyhint="next">
+                <button type="button" data-paso="1" data-campo="ubVacante" aria-label="Sumar">+</button>
+              </div>
+            </div>
+            <div class="num">
+              <label for="ubLicencia">Licencia / Vacaciones</label>
+              <div class="stepper">
+                <button type="button" data-paso="-1" data-campo="ubLicencia" aria-label="Restar">−</button>
+                <input id="ubLicencia" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0" enterkeyhint="next">
+                <button type="button" data-paso="1" data-campo="ubLicencia" aria-label="Sumar">+</button>
+              </div>
+            </div>
+            <div class="num">
+              <label for="ubPrestado">Prestado a otro servicio</label>
+              <div class="stepper">
+                <button type="button" data-paso="-1" data-campo="ubPrestado" aria-label="Restar">−</button>
+                <input id="ubPrestado" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0" enterkeyhint="next">
+                <button type="button" data-paso="1" data-campo="ubPrestado" aria-label="Sumar">+</button>
+              </div>
+            </div>
+            <div class="num">
+              <label for="ubOtro">Otro (detallar)</label>
+              <div class="stepper">
+                <button type="button" data-paso="-1" data-campo="ubOtro" aria-label="Restar">−</button>
+                <input id="ubOtro" type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" placeholder="0" enterkeyhint="next">
+                <button type="button" data-paso="1" data-campo="ubOtro" aria-label="Sumar">+</button>
+              </div>
+            </div>
+          </div>
+          <div id="ctrlB" class="control neutro"></div>
         </div>
 
         <label for="obs">Observaciones / Detalle de novedades <span id="obsOb" class="ob oculto">* obligatorio</span></label>
@@ -458,6 +499,7 @@
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
   var BASE = ['requerida', 'presente', 'francos'];
   var DESGLOSE = ['ausentes', 'enfermedad', 'art', 'licencias', 'sobrantes', 'ausentes3'];
+  var BLOQUE_B = ['ubVacante', 'ubLicencia', 'ubPrestado', 'ubOtro'];
   var MOTIVOS_DEF = ['Evento / Limpieza de obra', 'Capacitación', 'Solapamiento por alta/baja', 'Refuerzo autorizado por Operaciones/RRHH', 'Otro'];
   var ROLES_DEF = ['Supervisor', 'Referente', 'Coordinador'];
   var NO_COMPENSAN_DEF = ['Evento / Limpieza de obra'];   // sobrante para tarea específica: no cubre ausencias
@@ -581,7 +623,7 @@
       };
     });
     // "Siguiente" del teclado del celular pasa al próximo campo visible
-    var orden = ['requerida', 'francos', 'presente', 'ausentes', 'enfermedad', 'art', 'licencias', 'sobrantes', 'obs'];
+    var orden = ['requerida', 'francos', 'presente', 'ausentes', 'enfermedad', 'art', 'licencias', 'sobrantes', 'ubVacante', 'ubLicencia', 'ubPrestado', 'ubOtro', 'obs'];
     orden.slice(0, -1).forEach(function (id, i) {
       $(id).onkeydown = function (e) {
         if (e.key !== 'Enter') return;
@@ -704,7 +746,7 @@
         validar();
       });
       iniciarSteppers();
-      BASE.concat(DESGLOSE, ['contratadaManual']).forEach(function (id) {
+      BASE.concat(DESGLOSE, BLOQUE_B, ['contratadaManual']).forEach(function (id) {
         $(id).oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 3); validar(); };
       });
       $('conNovedades').onchange = validar;
@@ -730,7 +772,7 @@
     if (tambienServicio) { bSer.cambiar(); S.servicio = null; }
     S.turno = null; S.dot = null; S.motivo = ''; S.rol = 'Supervisor';
     Array.prototype.forEach.call($('turnos').children, function (x) { x.classList.remove('sel'); });
-    BASE.concat(DESGLOSE, ['contratadaManual', 'obs', 'firmante']).forEach(function (id) { $(id).value = ''; $(id).classList.remove('mal'); });
+    BASE.concat(DESGLOSE, BLOQUE_B, ['contratadaManual', 'obs', 'firmante']).forEach(function (id) { $(id).value = ''; $(id).classList.remove('mal'); });
     $('conNovedades').checked = false;
     marcarChip('motivos', '');
     marcarChip('roles', 'Supervisor');
@@ -807,40 +849,46 @@
     if (S.dot && faltan.length) pend.push('Completá: ' + faltan.join(', ') + ' (0 si no hay).');
 
     // 2) Control del contrato: Requeridos + Francos = Contratados
-    var controlOk = true;
+    var controlOk = true, sinUbicar = 0;
     if (c !== null && v.requerida !== null && v.francos !== null) {
       var teo = v.requerida + v.francos;
       controlOk = teo === c;
+      sinUbicar = Math.max(0, c - teo);   // del contrato, ni requeridos ni de franco
       if (controlOk) pintarControl('ctrlContrato', 'ok', '✔ Requeridos + Francos = ' + teo + ' = ' + c + ' contratados', '');
+      else if (sinUbicar) pintarControl('ctrlContrato', 'ambar', '⚠️ Requeridos + Francos = ' + teo + ' de ' + c + ' contratados: ' + sinUbicar + ' sin franco ni requeridos',
+        'Hay ' + sinUbicar + ' persona(s) del contrato que no están requeridas ni de franco. Se suman a la diferencia: explicá dónde están en el recuadro "No están de franco ni requeridos".');
       else pintarControl('ctrlContrato', 'ambar', '⚠️ Requeridos + Francos = ' + teo + ' (contratados: ' + c + ')',
-        'No coincide con el contrato. Podés enviarlo, pero explicá el motivo en Observaciones.');
+        'Supera al contrato. Podés enviarlo, pero explicá el motivo en Observaciones.');
     } else {
       pintarControl('ctrlContrato', 'neutro', '', 'Control: Requeridos + Francos debería ser igual a los contratados.');
     }
 
-    // 3) Diferencia / Faltantes = Requeridos − Presentes
-    var dif = null, box = $('difBox');
+    // 3) Diferencia / Faltantes total = (Requeridos − Presentes) + contratados sin ubicar
+    var dif = null, difOp = null, box = $('difBox');
     if (v.requerida !== null && v.presente !== null) {
-      dif = v.requerida - v.presente;
+      difOp = v.requerida - v.presente;
+      dif = difOp + sinUbicar;
       $('difVal').textContent = conSigno(dif);
       var det = $('difDet'); det.innerHTML = '';
       var bt = document.createElement('b'); bt.textContent = 'Diferencia / Faltantes total';
       var st = document.createElement('span');
-      if (dif > 0) { box.className = 'difBox mal'; st.textContent = 'Faltan ' + dif + ' persona(s) para cubrir lo requerido. Completá el desglose.'; }
+      if (dif > 0) { box.className = 'difBox mal'; st.textContent = (sinUbicar ? difOp + ' no se presentaron + ' + sinUbicar + ' que no están de franco ni requeridos. ' : 'Faltan ' + dif + ' persona(s) para cubrir lo requerido. ') + 'Completá el desglose.'; }
       else if (dif < 0) { box.className = 'difBox ambar'; st.textContent = 'Hay ' + (-dif) + ' persona(s) de más. Indicá los sobrantes y el motivo.'; }
       else { box.className = 'difBox ok'; st.textContent = 'Sin diferencia: el servicio está cubierto.'; }
       det.appendChild(bt); det.appendChild(st);
     } else {
       box.className = 'difBox neutro'; $('difVal').textContent = '–';
-      $('difDet').textContent = 'Se calcula sola: Requeridos − Presentes.';
+      $('difDet').textContent = 'Se calcula sola: Requeridos − Presentes (+ contratados sin ubicar).';
     }
 
     // 4) Desglose: obligatorio si la diferencia no es 0 (opcional si es 0)
-    $('novBox').classList.toggle('oculto', dif !== 0);
-    var activo = dif !== null && (dif !== 0 || $('conNovedades').checked);
+    // Bloque A (No se presentaron) se explica contra Requeridos − Presentes
+    $('novBox').classList.toggle('oculto', difOp !== 0);
+    var activo = difOp !== null && (difOp !== 0 || $('conNovedades').checked);
+    $('tituloA').firstChild.nodeValue = (sinUbicar ? 'No se presentaron: ' + conSigno(difOp) : 'Desglose de novedades') + ' ';
     $('desglose').classList.toggle('oculto', !activo);
-    var g = { ausentes: 0, enfermedad: 0, art: 0, licencias: 0, sobrantes: 0, ausentes3: 0, compensados: 0, faltanteReal: 0 };
-    var faltantes = 0;
+    var g = { ausentes: 0, enfermedad: 0, art: 0, licencias: 0, ubVacante: 0, ubLicencia: 0, ubPrestado: 0, ubOtro: 0, sumB: 0, sobrantes: 0, ausentes3: 0, compensados: 0, faltanteReal: 0 };
+    var faltantes = 0, faltA = 0;
     if (activo) {
       var malos = false;
       DESGLOSE.forEach(function (k) {
@@ -851,34 +899,31 @@
       if (malos) pend.push('El desglose solo admite números enteros.');
       $('sub3').classList.toggle('oculto', g.ausentes === 0);
       if (g.ausentes === 0) g.ausentes3 = 0;
-      faltantes = g.ausentes + g.enfermedad + g.art + g.licencias;
+      faltA = g.ausentes + g.enfermedad + g.art + g.licencias;
+      var dA = difOp;
       // Sobrantes que cubren ausencias (están dentro de los presentes) = Faltantes − Diferencia.
       // El resto de los sobrantes está afectado a otra cosa (evento, capacitación…) y solo se informa.
-      var cubren = faltantes - dif, fuera = g.sobrantes - cubren;
+      var cubren = faltA - dA, fuera = g.sobrantes - cubren;
       if (cubren < 0) {
-        pintarControl('ctrlDesglose', 'mal', '✖ Desglose: ' + faltantes + ' de ' + conSigno(dif),
-          dif > 0 ? 'Falta explicar ' + (-cubren) + ' persona(s): sumá ausentes, enfermedad, ART o licencias.'
-                  : 'Hay ' + (-dif) + ' persona(s) de más: cargalas como sobrantes.');
-        pend.push(dif > 0 ? 'Explicá las ' + dif + ' persona(s) que faltan en el desglose.' : 'Cargá los ' + (-dif) + ' presentes de más como sobrantes.');
-      } else if (fuera < 0 && faltantes === 0) {
-        pintarControl('ctrlDesglose', 'mal', '✖ Hay ' + (-dif) + ' persona(s) de más', 'Cargalas como sobrantes / supernumerales y elegí el motivo.');
-        pend.push('Cargá los ' + (-dif) + ' presentes de más como sobrantes.');
+        pintarControl('ctrlDesglose', 'mal', '✖ Desglose: ' + faltA + ' de ' + conSigno(dA),
+          dA > 0 ? 'Falta explicar ' + (-cubren) + ' persona(s): sumá ausentes, enfermedad, ART o licencias.'
+                 : 'Hay ' + (-dA) + ' persona(s) de más: cargalas como sobrantes.');
+        pend.push(dA > 0 ? 'Explicá las ' + dA + ' persona(s) que no se presentaron.' : 'Cargá los ' + (-dA) + ' presentes de más como sobrantes.');
+      } else if (fuera < 0 && faltA === 0) {
+        pintarControl('ctrlDesglose', 'mal', '✖ Hay ' + (-dA) + ' persona(s) de más', 'Cargalas como sobrantes / supernumerales y elegí el motivo.');
+        pend.push('Cargá los ' + (-dA) + ' presentes de más como sobrantes.');
       } else if (fuera < 0) {
-        pintarControl('ctrlDesglose', 'mal', '✖ Hay ' + faltantes + ' faltante(s) pero la diferencia es ' + conSigno(dif),
+        pintarControl('ctrlDesglose', 'mal', '✖ Hay ' + faltA + ' ausencia(s) pero no se presentaron ' + dA,
           (-fuera) + ' ausencia(s) quedaron cubiertas: cargá en Sobrantes quién las cubrió.');
         pend.push('Indicá en Sobrantes quién cubrió las ausencias.');
       } else {
         // Compensación: salvo "Evento / Limpieza de obra" (tarea específica), los sobrantes cubren a los faltantes
-        var compensan = g.sobrantes > 0 && !!S.motivo && D.motivosNoCompensan.indexOf(S.motivo) < 0;
-        g.compensados = compensan ? Math.min(faltantes, g.sobrantes) : 0;
-        g.faltanteReal = faltantes - g.compensados;
-        var det = 'Faltantes ' + faltantes + ' · Diferencia ' + conSigno(dif);
+        var det = 'Ausencias ' + faltA + ' · No se presentaron ' + conSigno(dA);
+        var compA = g.sobrantes > 0 && !!S.motivo && D.motivosNoCompensan.indexOf(S.motivo) < 0;
         if (g.sobrantes && !S.motivo) det += ' · Elegí el motivo de los sobrantes para saber si cubren las ausencias.';
-        else if (g.sobrantes && !compensan && faltantes) det += ' · Los ' + g.sobrantes + ' sobrante(s) están para ' + S.motivo + ': no cubren ausencias.';
-        else if (g.compensados) det += ' · ' + g.compensados + ' ausencia(s) cubierta(s) por sobrantes (' + S.motivo + ').';
-        if (faltantes) det += '  →  FALTANTE REAL (sin cubrir): ' + g.faltanteReal;
-        pintarControl('ctrlDesglose', g.faltanteReal > 0 ? 'ambar' : 'ok',
-          '✔ El desglose explica la diferencia (' + conSigno(dif) + ')' + (faltantes ? (g.faltanteReal ? ' · faltan ' + g.faltanteReal + ' sin cubrir' : ' · ausencias cubiertas') : ''), det);
+        else if (g.sobrantes && !compA && faltA) det += ' · Los ' + g.sobrantes + ' sobrante(s) están para ' + S.motivo + ': no cubren ausencias.';
+        else if (compA && faltA) det += ' · ' + Math.min(faltA, g.sobrantes) + ' ausencia(s) cubierta(s) por sobrantes (' + S.motivo + ').';
+        pintarControl('ctrlDesglose', 'ok', '✔ Explicado (' + conSigno(dA) + ')', det);
       }
       // Alerta de ausencia prolongada
       $('ausentes3').parentNode.classList.toggle('mal', g.ausentes3 > g.ausentes);
@@ -892,6 +937,36 @@
       $('motivoBox').classList.toggle('oculto', g.sobrantes === 0);
       $('motivos').classList.toggle('mal', g.sobrantes > 0 && !S.motivo);
       if (g.sobrantes > 0 && !S.motivo) pend.push('Elegí el motivo del personal sobrante.');
+    }
+
+    // Bloque B (No están de franco ni requeridos) tiene que cerrar exacto
+    $('desgloseB').classList.toggle('oculto', !sinUbicar);
+    if (sinUbicar) {
+      $('tituloB').firstChild.nodeValue = 'No están de franco ni requeridos: ' + sinUbicar + ' ';
+      var malB = false;
+      BLOQUE_B.forEach(function (k) {
+        g[k] = enteroOCero(k);
+        $(k).parentNode.classList.toggle('mal', g[k] === null);
+        if (g[k] === null) { malB = true; g[k] = 0; }
+      });
+      if (malB) pend.push('El recuadro "No están de franco ni requeridos" solo admite números enteros.');
+      g.sumB = g.ubVacante + g.ubLicencia + g.ubPrestado + g.ubOtro;
+      if (g.sumB === sinUbicar) pintarControl('ctrlB', 'ok', '✔ Ubicadas las ' + sinUbicar + ' persona(s)', '');
+      else {
+        pintarControl('ctrlB', 'mal', '✖ Ubicaste ' + g.sumB + ' de ' + sinUbicar,
+          g.sumB < sinUbicar ? 'Falta indicar dónde están ' + (sinUbicar - g.sumB) + ' persona(s).' : 'Cargaste ' + (g.sumB - sinUbicar) + ' de más.');
+        pend.push('Indicá dónde están las ' + sinUbicar + ' persona(s) que no están de franco ni requeridas.');
+      }
+    }
+    // Faltante real (total): ausencias + bloque B, menos lo que compensan los sobrantes
+    faltantes = faltA + g.sumB;
+    var compensan = g.sobrantes > 0 && !!S.motivo && D.motivosNoCompensan.indexOf(S.motivo) < 0;
+    g.compensados = compensan ? Math.min(faltantes, g.sobrantes) : 0;
+    g.faltanteReal = faltantes - g.compensados;
+    if (faltantes > 0 && dif !== null) {
+      var fr = document.createElement('span'); fr.style.cssText = 'display:block;margin-top:4px;font-weight:700';
+      fr.textContent = 'Faltante real (sin cubrir): ' + g.faltanteReal + (g.compensados ? ' · ' + g.compensados + ' cubierto(s) por sobrantes' : '');
+      $('difDet').appendChild(fr);
     }
 
     // 5) Observaciones obligatorias si hay novedades (o el contrato no cierra)
@@ -914,8 +989,8 @@
     $('btnRevisar').disabled = pend.length > 0;
     $('btnRevisar').textContent = pend.length && S.dot ? 'Revisar reporte (' + pend.length + ' pendiente' + (pend.length > 1 ? 's' : '') + ')' : 'Revisar reporte';
 
-    sinGuardar = !!(S.servicio || BASE.concat(DESGLOSE).some(function (k) { return $(k).value; }) || $('obs').value);
-    ultimoEstado = { ok: !pend.length, v: v, g: g, activo: activo, contratada: c, dif: dif, controlOk: controlOk, firmante: firmante };
+    sinGuardar = !!(S.servicio || BASE.concat(DESGLOSE, BLOQUE_B).some(function (k) { return $(k).value; }) || $('obs').value);
+    ultimoEstado = { ok: !pend.length, v: v, g: g, activo: activo, contratada: c, dif: dif, difOp: difOp, sinUbicar: sinUbicar, controlOk: controlOk, firmante: firmante };
     return ultimoEstado;
   }
 
@@ -929,16 +1004,17 @@
       ['Requeridos / Asignados', x.requerida],
       ['Presentes', x.presente],
       ['Francos', x.francos],
-      ['Diferencia / Faltantes', conSigno(x.diferencia)]
+      ['Diferencia / Faltantes', conSigno(x.diferencia) + (x.sinUbicar ? '  (' + x.difOperativa + ' no se presentaron + ' + x.sinUbicar + ' no están de franco ni requeridos)' : '')]
     ];
-    var hayDesglose = x.ausentes || x.enfermedad || x.art || x.licencias || x.sobrantes;
+    var hayDesglose = x.ausentes || x.enfermedad || x.art || x.licencias || x.sinUbicar || x.sobrantes;
     if (hayDesglose) {
       filas.push(['Ausentes', x.ausentes + (x.ausentes3 ? '  (🚨 ' + x.ausentes3 + ' con 3+ días)' : '')]);
       filas.push(['Enfermedad / Lic. médica', x.enfermedad]);
       filas.push(['ART / Accidente', x.art]);
       filas.push(['Lic. especial / Vacaciones', x.licencias]);
       filas.push(['Sobrantes / Supernumerales', x.sobrantes + (x.sobrantes && x.motivoSobrante ? ' · ' + x.motivoSobrante : '')]);
-      if (x.ausentes || x.enfermedad || x.art || x.licencias) filas.push(['Faltante real (sin cubrir)', x.faltanteReal + (x.compensados ? '  (' + x.compensados + ' cubierto' + (x.compensados > 1 ? 's' : '') + ' por sobrantes)' : '')]);
+      if (x.sinUbicar) filas.push(['No están de franco ni requeridos', x.sinUbicar + ': ' + [['Vacante', x.ubVacante], ['Licencia', x.ubLicencia], ['Prestado', x.ubPrestado], ['Otro', x.ubOtro]].filter(function (z) { return z[1]; }).map(function (z) { return z[0] + ' ' + z[1]; }).join(', ')]);
+      if (x.ausentes || x.enfermedad || x.art || x.licencias || x.sinUbicar) filas.push(['Faltante real (sin cubrir)', x.faltanteReal + (x.compensados ? '  (' + x.compensados + ' cubierto' + (x.compensados > 1 ? 's' : '') + ' por sobrantes)' : '')]);
     } else {
       filas.push(['Novedades', 'Sin novedades']);
     }
@@ -969,6 +1045,7 @@
         supervisor: S.nombre, clave: S.clave, servicio: S.servicio, turno: S.turno, fecha: $('fecha').value,
         requerida: $('requerida').value.trim(), presente: $('presente').value.trim(), francos: $('francos').value.trim(),
         ausentes: val('ausentes'), enfermedad: val('enfermedad'), art: val('art'), licencias: val('licencias'),
+        ubVacante: String(g.ubVacante), ubLicencia: String(g.ubLicencia), ubPrestado: String(g.ubPrestado), ubOtro: String(g.ubOtro),
         sobrantes: val('sobrantes'), ausentes3: val('ausentes3'),
         motivoSobrante: e.activo && g.sobrantes > 0 ? S.motivo : '',
         rolFirma: S.rol, firmante: S.rol === 'Supervisor' ? '' : e.firmante,
@@ -979,8 +1056,8 @@
         respOperativo: S.dot ? S.dot.respOperativo : '', contratada: S.dot && S.dot.encontrada ? S.dot.contratada : e.contratada,
         requerida: e.v.requerida, presente: e.v.presente, francos: e.v.francos, diferencia: e.dif,
         ausentes: e.activo ? g.ausentes : 0, enfermedad: e.activo ? g.enfermedad : 0, art: e.activo ? g.art : 0,
-        licencias: e.activo ? g.licencias : 0, sobrantes: e.activo ? g.sobrantes : 0, ausentes3: e.activo ? g.ausentes3 : 0,
-        compensados: e.activo ? g.compensados : 0, faltanteReal: e.activo ? g.faltanteReal : 0,
+        licencias: e.activo ? g.licencias : 0, ubVacante: g.ubVacante, ubLicencia: g.ubLicencia, ubPrestado: g.ubPrestado, ubOtro: g.ubOtro, sinUbicar: e.sinUbicar, difOperativa: e.difOp, sobrantes: e.activo ? g.sobrantes : 0, ausentes3: e.activo ? g.ausentes3 : 0,
+        compensados: g.compensados, faltanteReal: g.faltanteReal,
         motivoSobrante: S.motivo, observaciones: $('obs').value.trim(), responsable: responsable
       },
       ok: e.ok
