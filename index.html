@@ -1099,7 +1099,11 @@
       var wa = $('okWa'); wa.innerHTML = '';
       (r.whatsapp || []).forEach(function (w) {
         var a = document.createElement('a');
-        a.href = w.url; a.target = '_blank'; a.rel = 'noopener'; a.className = 'btn wa';
+        // Celular: abre la app (whatsapp://). PC: WhatsApp Web directo (así no se rompen los emojis).
+        var movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (w.num && w.texto && movil) { a.href = 'whatsapp://send?phone=' + w.num + '&text=' + encodeURIComponent(w.texto); }
+        else { a.href = (w.num && w.texto) ? 'https://web.whatsapp.com/send?phone=' + w.num + '&text=' + encodeURIComponent(w.texto) : w.url; a.target = '_blank'; a.rel = 'noopener'; }
+        a.className = 'btn wa';
         a.textContent = '💬 Enviar por WhatsApp a ' + w.nombre;
         wa.appendChild(a);
       });
