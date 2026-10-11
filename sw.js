@@ -15,7 +15,7 @@
    Al publicar cambios en index.html no hace falta tocar este archivo.
    Si cambiás íconos o el manifest, subí el número de VERSION.
    ============================================================ */
-var VERSION = 'presentismo-v5.0';
+var VERSION = 'presentismo-v5.4';
 var ARCHIVOS = [
   './',
   './index.html',
