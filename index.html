@@ -233,6 +233,75 @@
     .logo .txt b { font-size:15px; }
     .logo .txt span { font-size:12px; }
   }
+/* ===== TEMA CLAYMORFISMO (solo visual) ===== */
+:root{--clay:#e9f0fb;--sh-o:8px 8px 18px rgba(120,150,190,.42),-7px -7px 16px rgba(255,255,255,.95);
+--sh-i:inset 3px 3px 6px rgba(255,255,255,.9),inset -4px -4px 8px rgba(150,175,210,.32);
+--hund:inset 5px 5px 10px rgba(120,150,190,.42),inset -5px -5px 10px #fff;--radio:26px;--gris:#e3ebf7;--borde:transparent}
+body{background:#dfe9f7!important;font-family:'Nunito','Segoe UI',Roboto,Arial,sans-serif}
+header{background:#dfe9f7!important;border-bottom:0!important;padding-bottom:6px!important}
+.marca{background:var(--clay);border-radius:26px;padding:8px 14px;box-shadow:var(--sh-o),var(--sh-i)}
+.logo .txt b{color:var(--azul);font-weight:900}
+.logo svg{width:auto!important;height:40px!important}
+.salir,.instalar{border-radius:20px!important;border:0!important;background:var(--clay)!important;color:var(--azul2)!important;font-weight:800;box-shadow:4px 4px 9px rgba(120,150,190,.45),-4px -4px 9px #fff}
+.card{background:var(--clay)!important;border:0!important;border-radius:28px!important;box-shadow:var(--sh-o),var(--sh-i)!important;padding:18px!important}
+.card h2{font-weight:900;color:var(--azul);font-size:19px}
+label{font-weight:800;color:#2b4766}
+.seccion{border-top:0!important;color:var(--azul2);font-weight:900}
+.ayuda{color:#5b6f8a}
+input,textarea{border:0!important;border-radius:22px!important;background:#e3ebf7!important;box-shadow:var(--hund)!important;font-weight:700;color:var(--azul)}
+input:focus,textarea:focus{outline:3px solid rgba(46,117,182,.35)!important}
+input[type=checkbox]{box-shadow:none!important;background:none!important}
+.buscar input{padding-left:44px}
+.lista{border:0!important;border-radius:22px!important;background:#e3ebf7!important;box-shadow:var(--hund)}
+.lista button{background:transparent!important;border-bottom:2px solid rgba(255,255,255,.8)!important;font-weight:700;color:var(--azul)}
+.elegido{border:0!important;border-radius:22px!important;background:var(--clay)!important;box-shadow:var(--sh-o),var(--sh-i);color:var(--azul)}
+.elegido button{border:0!important;border-radius:16px!important;background:var(--clay)!important;box-shadow:3px 3px 7px rgba(120,150,190,.45),-3px -3px 7px #fff;font-weight:800}
+/* botones */
+.btn{border-radius:30px!important;min-height:58px!important;font-weight:900!important;letter-spacing:.4px;font-size:17px!important;color:#fff;
+background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 20px rgba(46,117,182,.42),-6px -6px 14px #fff,inset 4px 4px 8px rgba(255,255,255,.4),inset -5px -5px 10px rgba(20,60,110,.35)!important;text-shadow:0 2px 3px rgba(0,0,0,.22)}
+.btn.ok{background:linear-gradient(145deg,#4caf5a,#2e7d32)!important;box-shadow:9px 9px 20px rgba(46,125,50,.42),-6px -6px 14px #fff,inset 4px 4px 8px rgba(255,255,255,.45),inset -5px -5px 10px rgba(20,80,30,.4)!important}
+.btn.wa{background:linear-gradient(145deg,#3fcf7a,#1fa855)!important;box-shadow:9px 9px 20px rgba(31,168,85,.42),-6px -6px 14px #fff,inset 4px 4px 8px rgba(255,255,255,.45),inset -5px -5px 10px rgba(10,100,50,.4)!important}
+.btn.sec{background:var(--clay)!important;color:var(--azul)!important;text-shadow:none;box-shadow:var(--sh-o),var(--sh-i)!important}
+.btn:disabled{background:#cdd9ea!important;color:#8497b1;text-shadow:none;box-shadow:var(--hund)!important}
+.link{color:var(--azul2)}
+.acciones{background:linear-gradient(0deg,#dfe9f7 70%,rgba(223,233,247,0))!important;border-top:0!important}
+/* turnos y chips */
+.turnos button,.chips button{border:0!important;border-radius:24px!important;background:var(--clay)!important;font-weight:800;color:#5b6f8a;box-shadow:5px 5px 11px rgba(120,150,190,.45),-5px -5px 11px #fff}
+.turnos button.sel{background:linear-gradient(145deg,#f7bd2e,#f2a900)!important;color:#fff!important;box-shadow:5px 5px 12px rgba(242,169,0,.5),-4px -4px 10px #fff,inset 2px 2px 5px rgba(255,255,255,.55),inset -3px -3px 6px rgba(170,110,0,.35)!important;text-shadow:0 1px 2px rgba(120,70,0,.4)}
+.chips button.sel{background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;color:#fff!important;box-shadow:5px 5px 12px rgba(46,117,182,.45),-4px -4px 10px #fff,inset 2px 2px 5px rgba(255,255,255,.4)!important}
+/* contadores (se mantiene el − campo + de siempre) */
+.stepper{border:0!important;background:transparent!important;overflow:visible!important;align-items:center;column-gap:8px;grid-template-columns:48px minmax(0,1fr) 48px!important}
+.stepper button{width:48px;height:48px;min-height:48px!important;border-radius:50%!important;background:var(--clay)!important;color:var(--azul2)!important;font-size:26px!important;box-shadow:4px 4px 9px rgba(120,150,190,.5),-4px -4px 9px #fff,inset 1px 1px 2px #fff}
+.stepper button[data-paso="1"]{background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;color:#fff!important;box-shadow:4px 4px 9px rgba(46,117,182,.5),-3px -3px 8px #fff,inset 2px 2px 4px rgba(255,255,255,.4)!important}
+.stepper input{font-size:24px!important;font-weight:900!important;border-radius:22px!important;height:52px}
+.stepper:focus-within{outline:0!important}
+.kpi{background:var(--clay)!important;border-radius:22px!important;box-shadow:var(--sh-o),var(--sh-i)}
+.kpi b{color:var(--azul);font-weight:900}
+.control,.msg,.pend{border:0!important;border-radius:22px!important}
+.control.neutro{background:#e3ebf7!important;box-shadow:var(--hund);color:#5b6f8a}
+.control.ok,.msg.ok{background:#e1f3e4!important;box-shadow:inset 3px 3px 6px rgba(255,255,255,.8),inset -4px -4px 8px rgba(60,140,80,.25)}
+.control.mal{background:#ffe3df!important;box-shadow:inset 3px 3px 6px rgba(255,255,255,.8),inset -4px -4px 8px rgba(214,120,110,.3)}
+.control.ambar,.msg.aviso,.pend{background:#fff0cf!important;box-shadow:inset 3px 3px 6px rgba(255,255,255,.8),inset -4px -4px 8px rgba(200,150,40,.25)}
+.msg.error{background:#ffe3df!important}
+.difBox{border:0!important;border-radius:26px!important;padding:16px!important;box-shadow:var(--sh-o),var(--sh-i)}
+.difBox .val{font-size:44px!important;font-weight:900;text-shadow:2px 2px 0 #fff}
+.difBox.ok{background:#e1f3e4!important}.difBox.mal{background:#ffe3df!important}.difBox.ambar{background:#fff0cf!important}.difBox.neutro{background:var(--clay)!important}
+.desglose{border:0!important;border-radius:26px!important;background:#e3ebf7!important;box-shadow:var(--hund)}
+.sub3{background:var(--clay)!important;border-radius:20px!important;box-shadow:var(--sh-o)}
+.resumen td{border-bottom:2px solid rgba(255,255,255,.85)!important;font-weight:700}
+.resumen td:first-child{color:#5b6f8a}
+.modal .card{box-shadow:var(--sh-o),var(--sh-i)!important}
+.aviso-app{background:var(--clay)!important;border:0!important;border-radius:22px!important;box-shadow:var(--sh-o)}
+.sin-serv{background:#fff0cf!important}
+.spinner{border-color:#cdd9ea;border-top-color:var(--azul2)}
+
+.numeros .stepper{grid-template-columns:40px minmax(0,1fr) 40px!important;column-gap:5px}
+.numeros .stepper button{width:40px;height:40px;min-height:40px!important;font-size:22px!important}
+.numeros .stepper input{font-size:22px!important;padding:6px 2px!important}
+.btn.sec{border:0!important}
+.numeros .num{display:flex;flex-direction:column}
+.numeros .num .stepper{margin-top:auto}
+.numeros .stepper input{height:44px}
 </style>
 </head>
 <body>
@@ -240,15 +309,9 @@
 <header>
   <div class="marca">
     <div class="logo" id="logoBox">
-      <svg viewBox="0 0 40 40" aria-hidden="true">
-        <circle cx="20" cy="20" r="8" fill="#f2a900"/>
-        <g stroke="#f2a900" stroke-width="3" stroke-linecap="round">
-          <line x1="20" y1="3" x2="20" y2="8"/><line x1="20" y1="32" x2="20" y2="37"/>
-          <line x1="3" y1="20" x2="8" y2="20"/><line x1="32" y1="20" x2="37" y2="20"/>
-          <line x1="8" y1="8" x2="11.5" y2="11.5"/><line x1="28.5" y1="28.5" x2="32" y2="32"/>
-          <line x1="8" y1="32" x2="11.5" y2="28.5"/><line x1="28.5" y1="11.5" x2="32" y2="8"/>
-        </g>
-      </svg>
+      <svg viewBox="0 0 80 40" aria-hidden="true">
+<defs><g id="sun"><circle cx="0" cy="0" r="7" fill="#f2a900"/><g stroke="#f2a900" stroke-width="2.6" stroke-linecap="round"><line x1="0" y1="-17" x2="0" y2="-11"/><line x1="0" y1="17" x2="0" y2="11"/><line x1="-17" y1="0" x2="-11" y2="0"/><line x1="17" y1="0" x2="11" y2="0"/><line x1="-12" y1="-12" x2="-8" y2="-8"/><line x1="12" y1="12" x2="8" y2="8"/><line x1="-12" y1="12" x2="-8" y2="8"/><line x1="12" y1="-12" x2="8" y2="-8"/></g></g></defs>
+<use href="#sun" x="20" y="20"/><use href="#sun" x="58" y="20"/></svg>
       <div class="txt"><b>Los Soles Internacional S.A.</b><span>Limpieza Integral y Mantenimiento</span></div>
     </div>
     <button id="btnInstalar" class="instalar oculto" type="button">📲 Instalar</button>
