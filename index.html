@@ -6,13 +6,19 @@
 <title>Presentismo · Los Soles Internacional</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='9' fill='%23f2a900'/%3E%3Cg stroke='%23f2a900' stroke-width='3' stroke-linecap='round'%3E%3Cline x1='20' y1='2' x2='20' y2='7'/%3E%3Cline x1='20' y1='33' x2='20' y2='38'/%3E%3Cline x1='2' y1='20' x2='7' y2='20'/%3E%3Cline x1='33' y1='20' x2='38' y2='20'/%3E%3C/g%3E%3C/svg%3E">
+<!-- App instalable (PWA) · v5.0 -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Presentismo">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="application-name" content="Presentismo">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#1f4e79">
 <style>
   /* ============================================================
-     PRESENTISMO · LOS SOLES — Interfaz del supervisor (v4.0 · teoría vs realidad + desglose)
+     PRESENTISMO · LOS SOLES — Interfaz del supervisor (v5.0 · app instalable PWA)
      Diseño "mobile first": pensado primero para el celular y
      ampliado para PC (2 columnas desde 900 px de ancho).
      ============================================================ */
@@ -47,6 +53,11 @@
   .logo .txt span { display:block; color:var(--suave); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .usuario { display:flex; align-items:center; gap:8px; min-width:0; flex:0 1 auto; }
   .usuario b { font-size:12px; color:var(--texto); max-width:34vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .instalar { min-height:36px; padding:0 12px; background:var(--azul); border:0; color:#fff; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; flex:0 0 auto; white-space:nowrap; }
+  .aviso-app { max-width:532px; margin:10px auto 0; width:calc(100% - 28px); display:flex; align-items:flex-start; gap:10px; background:var(--azul-claro);
+    border:1px solid #bcd3ec; border-radius:10px; padding:10px 12px; font-size:13px; color:var(--texto); }
+  .aviso-app p { margin:0; flex:1; }
+  .aviso-app button { background:none; border:0; font-size:20px; line-height:1; color:var(--suave); cursor:pointer; padding:0 2px; min-height:0; }
   .salir { min-height:36px; padding:0 12px; background:#fff; border:1px solid var(--borde); color:var(--azul2); border-radius:8px; font-size:13px; cursor:pointer; flex:0 0 auto; }
 
   /* ---------- Contenedor y tarjetas ---------- */
@@ -234,12 +245,17 @@
       </svg>
       <div class="txt"><b>Los Soles Internacional S.A.</b><span>Limpieza Integral y Mantenimiento</span></div>
     </div>
+    <button id="btnInstalar" class="instalar oculto" type="button">📲 Instalar</button>
     <div class="usuario oculto" id="usuarioBox">
       <b id="hdrSup"></b>
       <button id="btnSalir" class="salir" type="button">Salir</button>
     </div>
   </div>
 </header>
+  <div id="avisoIos" class="aviso-app oculto" role="note">
+    <p>📲 <b>Instalá la app en tu iPhone:</b> tocá el botón <b>Compartir</b> (cuadrado con flecha ↑) y elegí <b>“Agregar a inicio”</b>.</p>
+    <button id="btnCerrarIos" type="button" aria-label="Cerrar aviso">×</button>
+  </div>
 <div class="wrap" id="wrap">
 
   <div id="vCargando" class="cargando"><div class="spinner"></div>Cargando…</div>
@@ -516,7 +532,7 @@
 </div>
 
 <script>
-  /* PRESENTISMO v4.0 — Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
+  /* PRESENTISMO v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
   var D = null;
   var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor' };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
@@ -1178,6 +1194,56 @@
       $('btnEditar').disabled = false;
     });
   }
+
+  /* ------------------------------------------------------------
+     APP INSTALABLE (PWA) · v5.0
+     - Android / PC (Chrome, Edge): aparece el botón "📲 Instalar".
+     - iPhone (Safari): aparece un aviso con los pasos (Apple no
+       permite un botón de instalación). Se puede cerrar y no vuelve
+       a mostrarse por 30 días.
+     - Si ya está instalada (abierta como app) no se muestra nada.
+     ------------------------------------------------------------ */
+  (function () {
+    var pedidoInstalar = null;
+    var instalada = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('Service worker no registrado:', e); });
+      });
+    }
+    if (instalada) return;
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      pedidoInstalar = e;
+      $('btnInstalar').classList.remove('oculto');
+    });
+    $('btnInstalar').addEventListener('click', function () {
+      if (!pedidoInstalar) return;
+      pedidoInstalar.prompt();
+      pedidoInstalar.userChoice.then(function () {
+        pedidoInstalar = null;
+        $('btnInstalar').classList.add('oculto');
+      });
+    });
+    window.addEventListener('appinstalled', function () {
+      $('btnInstalar').classList.add('oculto');
+    });
+
+    // iPhone / iPad con Safari
+    var ua = navigator.userAgent;
+    var esIos = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var esSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|GSA/i.test(ua);
+    var CLAVE = 'presentismo_aviso_ios';
+    var cerradoHace = Infinity;
+    try { var t = Number(localStorage.getItem(CLAVE) || 0); if (t) cerradoHace = Date.now() - t; } catch (e) {}
+    if (esIos && esSafari && cerradoHace > 30 * 86400000) $('avisoIos').classList.remove('oculto');
+    $('btnCerrarIos').addEventListener('click', function () {
+      $('avisoIos').classList.add('oculto');
+      try { localStorage.setItem(CLAVE, String(Date.now())); } catch (e) {}
+    });
+  })();
 </script>
 </body>
 </html>
