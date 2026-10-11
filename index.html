@@ -180,6 +180,12 @@
   .chips.mal button { border-color:var(--rojo); }
   .firma .chips { grid-template-columns:repeat(3, minmax(0, 1fr)); }
 
+  /* ---------- Recuperar PIN ---------- */
+  .link { display:block; width:100%; margin-top:12px; padding:10px; background:none; border:0; color:var(--azul2); font-size:15px; font-weight:600; text-decoration:underline; cursor:pointer; min-height:var(--toque); }
+  .modal { position:fixed; inset:0; z-index:50; background:rgba(16,32,52,.55); display:flex; align-items:center; justify-content:center; padding:var(--pad); }
+  .modal .card { width:100%; max-width:420px; margin:0; box-shadow:0 12px 40px rgba(0,0,0,.25); max-height:calc(100dvh - 2 * var(--pad)); overflow-y:auto; }
+  .modal .quien { margin-top:8px; padding:10px 12px; background:var(--azul-claro); border:1px solid #bcd6f0; border-radius:10px; font-weight:600; overflow-wrap:anywhere; }
+
   /* ---------- Celulares (≤ 420 px) ---------- */
   @media (max-width:420px) {
     :root { --pad:12px; }
@@ -257,6 +263,21 @@
 
       <div id="loginMsg" class="oculto"></div>
       <button id="btnIngresar" class="btn" type="button">Ingresar</button>
+      <button id="btnOlvide" class="link oculto" type="button">¿Olvidaste tu PIN? Recuperar acceso</button>
+    </div>
+  </div>
+
+  <!-- ================= RECUPERAR PIN (ventana) ================= -->
+  <div id="vRecuperar" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="recTitulo">
+    <div class="card">
+      <h2 id="recTitulo">Recuperar acceso</h2>
+      <p class="ayuda">Escribí el correo electrónico que tenés registrado (el principal o el segundo). Te enviaremos tu PIN a esa casilla.</p>
+      <div id="recQuien" class="quien"></div>
+      <label for="recEmail">Correo electrónico <span class="ob">*</span></label>
+      <input id="recEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="nombre@empresa.com.ar" enterkeyhint="send">
+      <div id="recMsg" class="oculto"></div>
+      <button id="btnRecEnviar" class="btn" type="button">Enviar mi PIN por correo</button>
+      <button id="btnRecCerrar" class="btn sec" type="button" style="margin-top:10px">Volver</button>
     </div>
   </div>
 
@@ -667,6 +688,7 @@
   function iniciarLogin() {
     bSup = buscador('sup', D.supervisores, function (n) {
       S.nombre = n || '';
+      $('btnOlvide').classList.add('oculto');
       $('clave').value = '';
       msg('loginMsg');
       if (n && !esCelular()) $('clave').focus();
@@ -680,7 +702,42 @@
     $('clave').oninput = function () { this.value = this.value.replace(/\D/g, ''); };
     $('verClave').onchange = function () { $('clave').type = this.checked ? 'text' : 'password'; };
     $('btnSalir').onclick = salir;
+    $('btnOlvide').onclick = abrirRecuperar;
+    $('btnRecCerrar').onclick = cerrarRecuperar;
+    $('btnRecEnviar').onclick = enviarRecuperacion;
+    $('recEmail').onkeydown = function (e) { if (e.key === 'Enter') enviarRecuperacion(); };
+    $('vRecuperar').onclick = function (e) { if (e.target === this) cerrarRecuperar(); };
     ver('vLogin');
+  }
+
+  /* ---------- Recuperar PIN por email ---------- */
+  function abrirRecuperar() {
+    if (!S.nombre) { msg('loginMsg', 'Primero buscá y elegí tu nombre de la lista.'); return; }
+    $('recQuien').textContent = '👤 ' + S.nombre;
+    $('recEmail').value = ''; msg('recMsg');
+    $('btnRecEnviar').disabled = false; $('btnRecEnviar').textContent = 'Enviar mi PIN por correo';
+    $('vRecuperar').classList.remove('oculto');
+    if (!esCelular()) $('recEmail').focus();
+  }
+  function cerrarRecuperar() { $('vRecuperar').classList.add('oculto'); }
+  function enviarRecuperacion() {
+    var email = $('recEmail').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg('recMsg', 'Escribí un correo electrónico válido.'); return; }
+    var btn = $('btnRecEnviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+    llamar('recuperarPin', S.nombre, email).then(function (r) {
+      if (r.ok) {
+        msg('recMsg', r.mensaje, 'ok');
+        btn.textContent = 'Correo enviado ✔';
+        S.fallidos = 0;
+        msg('loginMsg', 'Revisá tu correo y escribí el PIN que te enviamos.', 'aviso');
+      } else {
+        msg('recMsg', r.mensaje);
+        btn.disabled = false; btn.textContent = 'Enviar mi PIN por correo';
+      }
+    }).catch(function (e) {
+      msg('recMsg', 'Error de conexión: ' + errorTexto(e));
+      btn.disabled = false; btn.textContent = 'Enviar mi PIN por correo';
+    });
   }
 
   function ingresar() {
@@ -693,7 +750,13 @@
     $('clave').blur();
     var btn = $('btnIngresar'); btn.disabled = true; btn.textContent = 'Verificando…';
     llamar('ingresar', S.nombre, clave).then(function (r) {
-      if (!r.ok) { msg('loginMsg', r.mensaje); return; }
+      if (!r.ok) {
+        msg('loginMsg', r.mensaje);
+        // Al llegar a 5 intentos fallidos se ofrece recuperar el PIN por email
+        if (r.bloqueado) { $('btnOlvide').classList.remove('oculto'); $('clave').value = ''; }
+        return;
+      }
+      $('btnOlvide').classList.add('oculto');
       S.clave = clave; S.nombre = r.nombre;
       S.servicios = r.servicios || []; S.todos = !!r.todosLosServicios;   // solo los servicios de este supervisor
       try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
