@@ -302,6 +302,12 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
 .numeros .num{display:flex;flex-direction:column}
 .numeros .num .stepper{margin-top:auto}
 .numeros .stepper input{height:44px}
+/* Celulares angostos: el botón de instalar queda solo con el ícono */
+@media (max-width:400px){
+  .instalar{font-size:0!important;padding:0 10px!important;min-width:42px}
+  .instalar::after{content:'\1F4F2';font-size:17px;line-height:1}
+  .logo img{max-width:min(150px,40vw)}
+}
 </style>
 </head>
 <body>
@@ -324,6 +330,10 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
   <div id="avisoIos" class="aviso-app oculto" role="note">
     <p>📲 <b>Instalá la app en tu iPhone:</b> tocá el botón <b>Compartir</b> (cuadrado con flecha ↑) y elegí <b>“Agregar a inicio”</b>.</p>
     <button id="btnCerrarIos" type="button" aria-label="Cerrar aviso">×</button>
+  </div>
+  <div id="avisoInstalar" class="aviso-app oculto" role="note">
+    <p id="avisoInstalarTxt"></p>
+    <button id="btnCerrarInstalar" type="button" aria-label="Cerrar aviso">×</button>
   </div>
 <div class="wrap" id="wrap">
 
@@ -1310,18 +1320,42 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
     }
     if (instalada) return;
 
+    // El botón se muestra SIEMPRE (si la app todavía no está instalada).
+    // Si el navegador ofrece la instalación automática, la usa; si no, explica cómo hacerlo a mano.
+    $('btnInstalar').classList.remove('oculto');
+
     window.addEventListener('beforeinstallprompt', function (e) {
       e.preventDefault();
       pedidoInstalar = e;
       $('btnInstalar').classList.remove('oculto');
     });
+
+    function textoInstalarManual() {
+      var ua2 = navigator.userAgent;
+      if (/iPhone|iPad|iPod/i.test(ua2)) {
+        return '\u{1F4F2} <b>Instalá la app en tu iPhone:</b> tocá el botón <b>Compartir</b> (el cuadrado con la flecha ↑, abajo en el medio) y elegí <b>“Agregar a inicio”</b>.';
+      }
+      if (/Android/i.test(ua2)) {
+        return '\u{1F4F2} <b>Instalá la app en tu celular:</b> tocá los <b>tres puntitos ⋮</b> arriba a la derecha y elegí <b>“Instalar aplicación”</b> o <b>“Agregar a pantalla principal”</b>. Si ya la tenés instalada, buscá el ícono de los dos soles en tu celular.';
+      }
+      return '\u{1F4F2} <b>Instalá la app:</b> en la barra de direcciones, tocá el ícono de instalar (una pantalla con una flecha ↓), o abrí el menú <b>⋮</b> y elegí <b>“Instalar”</b>. Si ya la tenés instalada, buscá el ícono de los dos soles entre tus aplicaciones.';
+    }
+
     $('btnInstalar').addEventListener('click', function () {
-      if (!pedidoInstalar) return;
-      pedidoInstalar.prompt();
-      pedidoInstalar.userChoice.then(function () {
-        pedidoInstalar = null;
-        $('btnInstalar').classList.add('oculto');
-      });
+      if (pedidoInstalar) {
+        pedidoInstalar.prompt();
+        pedidoInstalar.userChoice.then(function () {
+          pedidoInstalar = null;
+          $('btnInstalar').classList.add('oculto');
+        });
+        return;
+      }
+      $('avisoIos').classList.add('oculto');
+      $('avisoInstalarTxt').innerHTML = textoInstalarManual();
+      $('avisoInstalar').classList.remove('oculto');
+    });
+    $('btnCerrarInstalar').addEventListener('click', function () {
+      $('avisoInstalar').classList.add('oculto');
     });
     window.addEventListener('appinstalled', function () {
       $('btnInstalar').classList.add('oculto');
