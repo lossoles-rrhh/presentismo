@@ -18,7 +18,7 @@
 <meta name="theme-color" content="#1f4e79">
 <style>
   /* ============================================================
-     PRESENTISMO · LOS SOLES — Interfaz del supervisor (v5.0 · app instalable PWA)
+     PRESENTISMO · LOS SOLES — Interfaz del supervisor (v5.3 · app instalable + perfiles de usuario)
      Diseño "mobile first": pensado primero para el celular y
      ampliado para PC (2 columnas desde 900 px de ancho).
      ============================================================ */
@@ -58,6 +58,12 @@
     border:1px solid #bcd3ec; border-radius:10px; padding:10px 12px; font-size:13px; color:var(--texto); }
   .aviso-app p { margin:0; flex:1; }
   .aviso-app button { background:none; border:0; font-size:20px; line-height:1; color:var(--suave); cursor:pointer; padding:0 2px; min-height:0; }
+  .perfil-tag { display:inline-block; font-size:11px; font-weight:700; color:#fff; background:var(--azul2); border-radius:10px; padding:2px 8px; margin-left:6px; vertical-align:middle; white-space:nowrap; }
+  .sin-serv { text-align:center; padding:28px 20px; }
+  .sin-serv .ico { font-size:46px; line-height:1; margin-bottom:10px; }
+  .sin-serv h2 { color:var(--ambar); margin-bottom:10px; }
+  .sin-serv p { font-size:16px; line-height:1.5; margin:0 0 18px; color:var(--texto); }
+  .sin-serv .quien { font-size:13px; color:var(--suave); margin-bottom:18px; }
   .salir { min-height:36px; padding:0 12px; background:#fff; border:1px solid var(--borde); color:var(--azul2); border-radius:8px; font-size:13px; cursor:pointer; flex:0 0 auto; }
 
   /* ---------- Contenedor y tarjetas ---------- */
@@ -294,6 +300,17 @@
       <div id="recMsg" class="oculto"></div>
       <button id="btnRecEnviar" class="btn" type="button">Enviar mi PIN por correo</button>
       <button id="btnRecCerrar" class="btn sec" type="button" style="margin-top:10px">Volver</button>
+    </div>
+  </div>
+
+  <!-- ================= SIN SERVICIOS ASIGNADOS (v5.3) ================= -->
+  <div id="vSinServ" class="oculto">
+    <div class="card sin-serv" role="alert">
+      <div class="ico">⚠️</div>
+      <h2>Sin servicios asignados</h2>
+      <p id="sinServTexto">Actualmente no tiene servicios asignados. Por favor, comuníquese con el área de RRHH para la asignación correspondiente.</p>
+      <div class="quien" id="sinServQuien"></div>
+      <button id="btnSinServSalir" class="btn sec" type="button">Salir</button>
     </div>
   </div>
 
@@ -534,7 +551,7 @@
 <script>
   /* PRESENTISMO v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
   var D = null;
-  var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor' };
+  var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor', perfil: '', perfilTexto: '', accesoTotal: false, sinServicios: false };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
   var BASE = ['requerida', 'presente', 'francos'];
   var DESGLOSE = ['ausentes', 'enfermedad', 'art', 'licencias', 'sobrantes', 'ausentes3'];
@@ -545,7 +562,7 @@
 
   function $(id) { return document.getElementById(id); }
   function ver(id) {
-    ['vCargando', 'vLogin', 'vForm', 'vRevision', 'vOk'].forEach(function (v) { $(v).classList.toggle('oculto', v !== id); });
+    ['vCargando', 'vLogin', 'vSinServ', 'vForm', 'vRevision', 'vOk'].forEach(function (v) { $(v).classList.toggle('oculto', v !== id); });
     $('wrap').classList.toggle('angosto', id === 'vLogin');
     window.scrollTo(0, 0);
   }
@@ -775,11 +792,16 @@
       $('btnOlvide').classList.add('oculto');
       S.clave = clave; S.nombre = r.nombre;
       S.servicios = r.servicios || []; S.todos = !!r.todosLosServicios;   // solo los servicios de este supervisor
+      S.perfil = r.perfil || 'SUPERVISOR_REGULAR'; S.perfilTexto = r.perfilTexto || '';
+      S.accesoTotal = !!r.accesoTotal;                                    // Admin RRHH o Supervisor Suplente
+      S.sinServicios = !!r.sinServicios || (!S.servicios.length && !S.accesoTotal);
       try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
       $('hdrSup').textContent = r.nombre;
+      if (S.accesoTotal) { var tag = document.createElement('span'); tag.className = 'perfil-tag'; tag.textContent = S.perfil === 'ADMIN_RRHH' ? 'Admin RRHH' : 'Suplente'; $('hdrSup').appendChild(tag); }
       $('usuarioBox').classList.remove('oculto');
       $('clave').value = '';
       msg('loginMsg');
+      if (S.sinServicios) { mostrarSinServicios(r.mensajeSinServicios); return; }
       iniciarForm();
     }).catch(function (e) {
       msg('loginMsg', 'Error de conexión: ' + errorTexto(e));
@@ -789,19 +811,30 @@
   function salir() {
     if (sinGuardar && !confirm('Tenés un reporte sin enviar. ¿Salir igual?')) return;
     sinGuardar = false;
-    S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor' };
+    S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor', perfil: '', perfilTexto: '', accesoTotal: false, sinServicios: false };
     $('clave').value = ''; $('hdrSup').textContent = '';
     $('usuarioBox').classList.add('oculto');
     bSup.cambiar();
     ver('vLogin');
   }
 
+  /* ---------- Supervisor regular sin servicios: se oculta el formulario y se muestra el aviso ---------- */
+  function mostrarSinServicios(texto) {
+    if (texto) $('sinServTexto').textContent = texto;
+    $('sinServQuien').textContent = '👤 ' + S.nombre;
+    $('btnSinServSalir').onclick = salir;
+    ver('vSinServ');
+  }
+
   /* ---------- Formulario ---------- */
   function iniciarForm() {
     // Lista de servicios del supervisor que ingresó (se arma de nuevo en cada ingreso)
     bSer = buscador('ser', S.servicios, function (n) { S.servicio = n; cargarDot(); });
-    if (!S.servicios.length) {
-      msg('serAviso', 'No tenés servicios asignados. Avisá a RRHH para que te los asignen.');
+    if (S.accesoTotal) {
+      msg('serAviso', (S.perfil === 'ADMIN_RRHH' ? '🔑 Perfil Administrador RRHH' : '🔄 Perfil Supervisor Suplente') +
+        ': podés informar cualquier servicio y turno (' + S.servicios.length + ' servicios).', 'ok');
+    } else if (!S.servicios.length) {
+      msg('serAviso', 'Actualmente no tiene servicios asignados. Por favor, comuníquese con el área de RRHH para la asignación correspondiente.');
     } else if (S.todos) {
       msg('serAviso', 'Todavía no tenés servicios asignados: se muestran todos. Elegí con cuidado el tuyo.', 'aviso');
     } else {
