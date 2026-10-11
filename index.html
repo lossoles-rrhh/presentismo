@@ -308,6 +308,8 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
   .instalar::after{content:'\1F4F2';font-size:17px;line-height:1}
   .logo img{max-width:min(150px,40vw)}
 }
+.aviso-app#avisoWhatsapp{background:#fff0cf!important;box-shadow:inset 3px 3px 6px rgba(255,255,255,.8),inset -4px -4px 8px rgba(200,150,40,.3)!important}
+.aviso-app#avisoWhatsapp p{color:#7a4a00;font-weight:600}
 </style>
 </head>
 <body>
@@ -330,6 +332,10 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
   <div id="avisoIos" class="aviso-app oculto" role="note">
     <p>📲 <b>Instalá la app en tu iPhone:</b> tocá el botón <b>Compartir</b> (cuadrado con flecha ↑) y elegí <b>“Agregar a inicio”</b>.</p>
     <button id="btnCerrarIos" type="button" aria-label="Cerrar aviso">×</button>
+  </div>
+  <div id="avisoWhatsapp" class="aviso-app oculto" role="note">
+    <p id="avisoWhatsappTxt"></p>
+    <button id="btnCerrarWa" type="button" aria-label="Cerrar aviso">×</button>
   </div>
   <div id="avisoInstalar" class="aviso-app oculto" role="note">
     <p id="avisoInstalarTxt"></p>
@@ -1330,8 +1336,26 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
       $('btnInstalar').classList.remove('oculto');
     });
 
+    // Navegador interno de WhatsApp, Facebook o Instagram: NO permite instalar apps.
+    // Hay que abrir el enlace en Chrome (Android) o Safari (iPhone).
+    function esNavegadorDeApp() {
+      var u = navigator.userAgent;
+      var ios = /iPhone|iPad|iPod/i.test(u);
+      if (/\bwv\b/i.test(u)) return true;                                   // WebView de Android (WhatsApp, etc.)
+      if (/FBAN|FBAV|FB_IAB|Instagram|Line\/|MicroMessenger|GSA\//i.test(u)) return true;
+      if (ios && /AppleWebKit/.test(u) && !/Safari/.test(u)) return true;    // WebView de iPhone
+      return false;
+    }
+    function textoNavegadorDeApp() {
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        return '\u{26A0}\u{FE0F} <b>Estás viendo la app dentro de WhatsApp.</b> Desde acá no se puede instalar. Tocá <b>Compartir</b> o los <b>tres puntitos</b> de esta pantalla y elegí <b>“Abrir en Safari”</b>. Después tocá el botón <b>📲 Instalar</b>.';
+      }
+      return '\u{26A0}\u{FE0F} <b>Estás viendo la app dentro de WhatsApp.</b> Desde acá no se puede instalar. Tocá los <b>tres puntitos ⋮</b> arriba a la derecha de esta pantalla y elegí <b>“Abrir en el navegador”</b> (o “Abrir en Chrome”). Después tocá el botón <b>📲 Instalar</b>.';
+    }
+
     function textoInstalarManual() {
       var ua2 = navigator.userAgent;
+      if (esNavegadorDeApp()) return textoNavegadorDeApp();
       if (/iPhone|iPad|iPod/i.test(ua2)) {
         return '\u{1F4F2} <b>Instalá la app en tu iPhone:</b> tocá el botón <b>Compartir</b> (el cuadrado con la flecha ↑, abajo en el medio) y elegí <b>“Agregar a inicio”</b>.';
       }
@@ -1356,6 +1380,14 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
     });
     $('btnCerrarInstalar').addEventListener('click', function () {
       $('avisoInstalar').classList.add('oculto');
+    });
+
+    if (esNavegadorDeApp()) {
+      $('avisoWhatsappTxt').innerHTML = textoNavegadorDeApp();
+      $('avisoWhatsapp').classList.remove('oculto');
+    }
+    $('btnCerrarWa').addEventListener('click', function () {
+      $('avisoWhatsapp').classList.add('oculto');
     });
     window.addEventListener('appinstalled', function () {
       $('btnInstalar').classList.add('oculto');
