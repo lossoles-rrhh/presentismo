@@ -310,6 +310,34 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
 }
 .aviso-app#avisoWhatsapp{background:#fff0cf!important;box-shadow:inset 3px 3px 6px rgba(255,255,255,.8),inset -4px -4px 8px rgba(200,150,40,.3)!important}
 .aviso-app#avisoWhatsapp p{color:#7a4a00;font-weight:600}
+/* ===== v5.7 · Accesibilidad + modo liviano para celulares económicos ===== */
+body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif !important; }
+/* Una sola sombra por elemento: se desplaza sin saltos en Android de gama baja */
+.card, .marca, .kpi, .elegido, .sub3, .difBox, .aviso-app { box-shadow: 0 2px 6px rgba(31,78,121,.18) !important; }
+.turnos button, .chips button, .stepper button, .salir, .instalar, .elegido button { box-shadow: 0 1px 3px rgba(31,78,121,.25) !important; }
+.btn { box-shadow: 0 2px 6px rgba(31,78,121,.30) !important; background: linear-gradient(145deg, #2e75b6, #1f4e79) !important; }
+.btn.ok { background: linear-gradient(145deg, #2e7d32, #1b5e20) !important; }
+.btn.wa { background: linear-gradient(145deg, #157a3d, #0f5f30) !important; }
+.btn:active:not(:disabled) { transform: translateY(2px) scale(.98); filter: brightness(.9); }
+/* Campos con borde visible: se reconocen como "cajita para escribir" */
+input, textarea, .lista { border: 2px solid #9db4cf !important; box-shadow: none !important; background: #fff !important; }
+input:focus, textarea:focus { border-color: #1f4e79 !important; outline: 3px solid rgba(46,117,182,.35) !important; }
+input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; background: #fff7f7 !important; }
+.stepper input { border-width: 2px !important; }
+/* Turno elegido: texto oscuro sobre amarillo (antes blanco, contraste 2:1) */
+.turnos button.sel { color: #1d2733 !important; text-shadow: none !important; }
+/* Botones −/+ siempre de 48 px */
+.numeros .stepper { grid-template-columns: 48px minmax(0,1fr) 48px !important; }
+.numeros .stepper button { width: 48px; height: 48px; min-height: 48px !important; }
+/* Letras mínimas de 14 px */
+.ayuda, .kpi span, .contador, .pend, .control small, .difBox .det, .resumen td:first-child { font-size: 14px !important; }
+.logo .txt span { font-size: 12px !important; }
+/* Cola de reportes sin señal */
+.cola-aviso { max-width:532px; margin:10px auto 0; width:calc(100% - 28px); background:#fff0cf; border:2px solid #f2a900; border-radius:16px; padding:12px 14px; font-size:15px; line-height:1.4; color:#5c3d00; font-weight:700; }
+.cola-aviso.cola-mal { background:#ffe3df; border-color:#c62828; color:#7f1d1d; }
+.cola-aviso p { margin:0 0 8px; }
+.cola-aviso .btn { margin-top:6px; }
+.cola-toast { position:fixed; left:12px; right:12px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:60; box-shadow:0 4px 14px rgba(0,0,0,.25) !important; font-weight:700; }
 </style>
 </head>
 <body>
@@ -628,7 +656,7 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
 </div>
 
 <script>
-  /* PRESENTISMO v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
+  /* PRESENTISMO v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
   var D = null;
   var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor', perfil: '', perfilTexto: '', accesoTotal: false, sinServicios: false };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
@@ -660,28 +688,36 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
 
   function llamar(fn) {
     var args = Array.prototype.slice.call(arguments, 1);
-    var intentos = SOLO_LECTURA[fn] ? 2 : 1;          // las consultas se reintentan; el envío del reporte NO (evita duplicados)
+    var conId = fn === 'guardarRegistro' && args[0] && args[0].idReporte;
+    var intentos = (SOLO_LECTURA[fn] || conId) ? 2 : 1;
+    var espera = fn === 'guardarRegistro' ? 40000 : 25000;
     function pedir(restan) {
       var ctrl = ('AbortController' in window) ? new AbortController() : null;
-      var corte = setTimeout(function () { if (ctrl) ctrl.abort(); }, 45000);
+      var corte = setTimeout(function () { if (ctrl) ctrl.abort(); }, espera);
       return fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // evita el "preflight" CORS
         body: JSON.stringify({ accion: fn, args: args }),
         redirect: 'follow',
-        credentials: 'omit',                                      // no usa las cuentas de Google del teléfono
+        credentials: 'omit',                                        // no usa las cuentas de Google del teléfono
         signal: ctrl ? ctrl.signal : undefined
       }).then(function (r) {
         clearTimeout(corte);
         if (!r.ok) throw new Error('El servidor respondió ' + r.status);
         return r.json();
       }).then(function (j) {
-        if (!j || !j.ok) throw new Error((j && j.error) || 'Respuesta inválida del servidor');
+        if (!j || !j.ok) {
+          // Error del servidor: si es por saturación, el reporte se puede guardar y reenviar
+          if (j && j.reintentar && fn === 'guardarRegistro') return { ok: false, reintentar: true, mensaje: j.error };
+          var e = new Error((j && j.error) || 'Respuesta inválida del servidor'); e.delServidor = true; throw e;
+        }
         return j.data;
       }).catch(function (e) {
         clearTimeout(corte);
         if (e && e.name === 'AbortError') e = new Error('La conexión tardó demasiado');
-        if (restan > 1 && !/servidor respondió|Acción/.test(e.message)) return pedir(restan - 1);
+        if (restan > 1 && !e.delServidor && !/servidor respondió/.test(e.message)) {
+          return new Promise(function (ok) { setTimeout(ok, 1500); }).then(function () { return pedir(restan - 1); });
+        }
         throw e;
       });
     }
@@ -770,30 +806,59 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
 
   /* ---------- Inicio ---------- */
   window.onload = function () {
-    llamar('obtenerLogo').then(function (uri) {
-      if (!uri) return;
-      var box = $('logoBox'); box.innerHTML = '';
-      var img = document.createElement('img'); img.src = uri; img.alt = 'Los Soles Internacional S.A. - Limpieza Integral y Mantenimiento';
-      box.appendChild(img);
-    }).catch(function () {});
+    var CLAVE_DATOS = 'presentismo_datos_v1';
+    function prepararD(d) {
+      if (!d.motivosSobrante || !d.motivosSobrante.length) d.motivosSobrante = MOTIVOS_DEF;
+      if (!d.rolesFirma || !d.rolesFirma.length) d.rolesFirma = ROLES_DEF;
+      if (!d.motivosNoCompensan) d.motivosNoCompensan = NO_COMPENSAN_DEF;
+      return d;
+    }
+    var guardado = null;
+    try { guardado = JSON.parse(localStorage.getItem(CLAVE_DATOS) || 'null'); } catch (e) {}
+    if (guardado && guardado.supervisores && guardado.turnos) {
+      D = prepararD(guardado);
+      iniciarLogin();                       // la pantalla de ingreso aparece sin esperar a internet
+    }
 
-    llamar('obtenerDatosIniciales').then(function (d) {
-      D = d;
-      if (!D.motivosSobrante || !D.motivosSobrante.length) D.motivosSobrante = MOTIVOS_DEF;
-      if (!D.rolesFirma || !D.rolesFirma.length) D.rolesFirma = ROLES_DEF;
-      if (!D.motivosNoCompensan) D.motivosNoCompensan = NO_COMPENSAN_DEF;
-      iniciarLogin();
-    }).catch(function (e) {
+    function actualizar() {
+      return llamar('obtenerDatosIniciales').then(function (d) {
+        d = prepararD(d);
+        var cambioLista = !D || JSON.stringify(D.supervisores) !== JSON.stringify(d.supervisores);
+        try { localStorage.setItem(CLAVE_DATOS, JSON.stringify(d)); } catch (e) {}
+        if (!D) { D = d; iniciarLogin(); return; }
+        D.hoy = d.hoy; D.fechaMin = d.fechaMin; D.turnos = d.turnos; D.obsMin = d.obsMin;
+        D.motivosSobrante = d.motivosSobrante; D.motivosNoCompensan = d.motivosNoCompensan; D.rolesFirma = d.rolesFirma;
+        if ($('fecha')) { $('fecha').max = D.hoy; $('fecha').min = D.fechaMin; }
+        // Lista de nombres: se rehace solo si cambió y la persona todavía no empezó a escribir su clave
+        if (cambioLista) {
+          D.supervisores = d.supervisores;
+          if (!$('vLogin').classList.contains('oculto') && !$('clave').value) iniciarLogin();
+        }
+      });
+    }
+    actualizar().catch(function (e) {
+      if (D) {                              // sin señal pero con datos guardados: se sigue trabajando
+        D.hoy = hoyLocal(); if ($('fecha')) $('fecha').max = D.hoy;
+        return;
+      }
       $('vCargando').innerHTML = '';
       var m = document.createElement('div'); m.className = 'msg error';
-      m.textContent = 'No se pudo cargar el formulario: ' + errorTexto(e) + '. Revisá tu conexión y recargá la página.';
+      m.textContent = 'No hay conexión y este celular todavía no tiene los datos guardados. Buscá señal y volvé a abrir la app. (' + errorTexto(e) + ')';
       $('vCargando').appendChild(m);
+    });
+
+    // Si la app quedó abierta de un día para otro, al volver a mirarla se actualiza la fecha
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && D) actualizar().catch(function () {});
     });
 
     // Aviso si se intenta cerrar o recargar con un reporte a medio cargar
     window.addEventListener('beforeunload', function (e) {
       if (sinGuardar) { e.preventDefault(); e.returnValue = ''; }
     });
+
+    pintarCola();
+    setTimeout(procesarCola, 3000);         // reportes que quedaron guardados de antes
   };
 
   /* ---------- Ingreso: nombre + (PIN o DNI) ---------- */
@@ -857,33 +922,29 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
     if (!S.nombre) { msg('loginMsg', 'Buscá y elegí tu nombre de la lista.'); return; }
     if (!clave) { msg('loginMsg', 'Ingresá tu PIN de 4 dígitos o tu DNI.'); return; }
     if (clave.length !== 4 && (clave.length < 6 || clave.length > 9)) {
-      msg('loginMsg', 'El PIN tiene 4 dígitos y el DNI entre 7 y 8 (sin puntos).'); return;
+      msg('loginMsg', 'El PIN tiene 4 números. El DNI, 7 u 8 números (sin puntos).'); return;
     }
     $('clave').blur();
     var btn = $('btnIngresar'); btn.disabled = true; btn.textContent = 'Verificando…';
-    llamar('ingresar', S.nombre, clave).then(function (r) {
+    var sinSenal = function (motivo) {
+      // Sin internet: entra con la última sesión guardada en ESTE celular (misma persona y misma clave)
+      return ingresoGuardado(S.nombre, clave).then(function (r) {
+        if (!r) { msg('loginMsg', 'Sin conexión (' + motivo + '). Para entrar sin señal tenés que haber ingresado antes en este celular con la misma clave. Buscá señal e intentá de nuevo.'); return; }
+        aplicarIngreso(r, clave);
+        avisoCola('📶 Sin señal: entraste con los datos guardados en el teléfono. Los reportes se envían solos cuando vuelva internet.', 'aviso');
+      });
+    };
+    var pedido = navigator.onLine === false ? Promise.reject(new Error('sin internet')) : llamar('ingresar', S.nombre, clave);
+    pedido.then(function (r) {
       if (!r.ok) {
         msg('loginMsg', r.mensaje);
-        // Al llegar a 5 intentos fallidos se ofrece recuperar el PIN por email
         if (r.bloqueado) { $('btnOlvide').classList.remove('oculto'); $('clave').value = ''; }
         return;
       }
-      $('btnOlvide').classList.add('oculto');
-      S.clave = clave; S.nombre = r.nombre;
-      S.servicios = r.servicios || []; S.todos = !!r.todosLosServicios;   // solo los servicios de este supervisor
-      S.perfil = r.perfil || 'SUPERVISOR_REGULAR'; S.perfilTexto = r.perfilTexto || '';
-      S.accesoTotal = !!r.accesoTotal;                                    // Admin RRHH o Supervisor Suplente
-      S.sinServicios = !!r.sinServicios || (!S.servicios.length && !S.accesoTotal);
-      try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
-      $('hdrSup').textContent = r.nombre;
-      if (S.accesoTotal) { var tag = document.createElement('span'); tag.className = 'perfil-tag'; tag.textContent = S.perfil === 'ADMIN_RRHH' ? 'Admin RRHH' : 'Suplente'; $('hdrSup').appendChild(tag); }
-      $('usuarioBox').classList.remove('oculto');
-      $('clave').value = '';
-      msg('loginMsg');
-      if (S.sinServicios) { mostrarSinServicios(r.mensajeSinServicios); return; }
-      iniciarForm();
+      guardarIngreso(r, clave);
+      aplicarIngreso(r, clave);
     }).catch(function (e) {
-      msg('loginMsg', 'Error de conexión: ' + errorTexto(e));
+      return sinSenal(errorTexto(e));
     }).then(function () { btn.disabled = false; btn.textContent = 'Ingresar'; });
   }
 
@@ -963,7 +1024,7 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
 
   function limpiar(tambienServicio) {
     if (tambienServicio) { bSer.cambiar(); S.servicio = null; }
-    S.turno = null; S.dot = null; S.motivo = ''; S.rol = 'Supervisor';
+    S.turno = null; S.dot = null; S.motivo = ''; S.rol = 'Supervisor'; S.idEnvio = null; S.cargadoEn = null;
     Array.prototype.forEach.call($('turnos').children, function (x) { x.classList.remove('sel'); });
     BASE.concat(DESGLOSE, BLOQUE_B, ['contratadaManual', 'obs', 'firmante']).forEach(function (id) { $(id).value = ''; $(id).classList.remove('mal'); });
     $('conNovedades').checked = false;
@@ -981,10 +1042,9 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
     if (!S.servicio || !S.turno) { $('dotCard').classList.add('oculto'); $('sinDot').classList.remove('oculto'); return; }
     $('sinDot').classList.add('oculto');
     $('dotCard').classList.remove('oculto');
-    $('dotCon').textContent = '…'; $('dotOp').textContent = '…'; $('dotEq').textContent = '…';
     $('manualBox').classList.add('oculto');
     var n = ++pedidoDot;
-    llamar('obtenerDotacion', S.servicio, S.turno).then(function (r) {
+    function mostrar(r) {
       if (n !== pedidoDot) return;
       S.dot = r;
       $('dotOp').textContent = r.respOperativo || 'Sin asignar';
@@ -998,7 +1058,11 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
       }
       validar();
       if (esCelular()) $('dotCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }).catch(function (e) {
+    }
+    var pre = S.dotaciones && S.dotaciones[S.servicio + '|' + S.turno];
+    if (pre) { mostrar(pre); return; }                 // dotación ya descargada al ingresar: sin esperar a internet
+    $('dotCon').textContent = '…'; $('dotOp').textContent = '…'; $('dotEq').textContent = '…';
+    llamar('obtenerDotacion', S.servicio, S.turno).then(mostrar).catch(function (e) {
       if (n !== pedidoDot) return;
       $('dotCon').textContent = '–'; $('dotOp').textContent = '–'; $('dotEq').textContent = '–';
       msg('formMsg', 'No se pudo leer la dotación: ' + errorTexto(e));
@@ -1276,22 +1340,37 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
   function enviar() {
     var d = datosActuales();
     if (!d.ok) { ver('vForm'); return; }
-    var btn = $('btnEnviar'); btn.disabled = true; btn.textContent = 'Enviando…';
-    $('btnEditar').disabled = true;
+    // ID único del reporte: si se reenvía (mala señal), la planilla no lo duplica
+    if (!S.idEnvio) { S.idEnvio = nuevoId(); S.cargadoEn = new Date().toISOString(); }
+    d.envio.idReporte = S.idEnvio;
+    d.envio.cargadoEn = S.cargadoEn;
+    var btn = $('btnEnviar'), btnEd = $('btnEditar');
+    var terminar = function () { btn.disabled = false; btn.textContent = 'Confirmar y enviar reporte'; btnEd.disabled = false; };
+    var guardarEnTelefono = function () {
+      return encolar(d.envio, d.vista).then(function () { mostrarGuardadoSinSenal(d.vista); });
+    };
+    msg('revMsg');
+    if (navigator.onLine === false) { guardarEnTelefono().then(terminar); return; }   // sin señal: directo a la cola
+    btn.disabled = true; btn.textContent = 'Enviando… no cierres la app';
+    btnEd.disabled = true;
     llamar('guardarRegistro', d.envio).then(function (r) {
       if (!r.ok) {
+        if (r.reintentar) return guardarEnTelefono();                                 // sistema saturado
         msg('revMsg', r.mensaje);
         if (r.relogin) setTimeout(function () { sinGuardar = false; salir(); }, 2500);
         return;
       }
       sinGuardar = false;
+      S.idEnvio = null; S.cargadoEn = null;
+      var cab = document.querySelector('#vOk .msg');
+      if (cab) { cab.className = 'msg ok'; cab.style.marginTop = '0'; cab.textContent = '✅ Reporte guardado y enviado'; }
       pintarTabla('okTabla', filasResumen(r.resumen), r.resumen.diferencia);
       $('okEmail').textContent = '📧 ' + String(r.email).replace(/(contacto\(s\)):.*$/, '$1');   // en pantalla solo la cantidad de contactos
-      var wa = $('okWa'); wa.innerHTML = '';
+      var wa = $('okWa'); wa.replaceChildren();
+      var movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
       (r.whatsapp || []).forEach(function (w) {
         var a = document.createElement('a');
         // Celular: abre la app (whatsapp://). PC: WhatsApp Web directo (así no se rompen los emojis).
-        var movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (w.num && w.texto && movil) { a.href = 'whatsapp://send?phone=' + w.num + '&text=' + encodeURIComponent(w.texto); }
         else { a.href = (w.num && w.texto) ? 'https://web.whatsapp.com/send?phone=' + w.num + '&text=' + encodeURIComponent(w.texto) : w.url; a.target = '_blank'; a.rel = 'noopener'; }
         a.className = 'btn wa';
@@ -1299,12 +1378,11 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
         wa.appendChild(a);
       });
       ver('vOk');
-    }).catch(function (e) {
-      msg('revMsg', 'Error de conexión: ' + errorTexto(e) + '. Puede que el reporte no se haya guardado: avisá a RRHH antes de reenviarlo para no duplicarlo.');
-    }).then(function () {
-      btn.disabled = false; btn.textContent = 'Confirmar y enviar reporte';
-      $('btnEditar').disabled = false;
-    });
+    }).catch(function () {
+      // Sin respuesta (señal mala o caída): se guarda en el teléfono y se reintenta solo.
+      // Si en realidad sí había llegado, el ID evita el duplicado.
+      return guardarEnTelefono();
+    }).then(terminar);
   }
 
   /* ------------------------------------------------------------
@@ -1406,6 +1484,207 @@ background:linear-gradient(145deg,#4d8fd4,#2e75b6)!important;box-shadow:9px 9px 
       try { localStorage.setItem(CLAVE, String(Date.now())); } catch (e) {}
     });
   })();
+
+  /* ---------- v5.7 · Utilidades nuevas ---------- */
+  function nuevoId() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+  function hoyLocal() {
+    var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+
+  /** Aplica la respuesta del ingreso (de internet o la guardada en el teléfono). */
+  function aplicarIngreso(r, clave) {
+    $('btnOlvide').classList.add('oculto');
+    S.clave = clave; S.nombre = r.nombre;
+    S.servicios = r.servicios || []; S.todos = !!r.todosLosServicios;
+    S.perfil = r.perfil || 'SUPERVISOR_REGULAR'; S.perfilTexto = r.perfilTexto || '';
+    S.accesoTotal = !!r.accesoTotal;
+    S.sinServicios = !!r.sinServicios || (!S.servicios.length && !S.accesoTotal);
+    S.dotaciones = r.dotaciones || {};
+    if (r.hoy && D && r.hoy > (D.hoy || '')) D.hoy = r.hoy;
+    try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
+    $('hdrSup').textContent = r.nombre;
+    if (S.accesoTotal) { var tag = document.createElement('span'); tag.className = 'perfil-tag'; tag.textContent = S.perfil === 'ADMIN_RRHH' ? 'Admin RRHH' : 'Suplente'; $('hdrSup').appendChild(tag); }
+    $('usuarioBox').classList.remove('oculto');
+    $('clave').value = '';
+    msg('loginMsg');
+    if (S.sinServicios) { mostrarSinServicios(r.mensajeSinServicios); return; }
+    iniciarForm();
+  }
+
+  /** Guarda en el teléfono el último ingreso correcto (la clave se guarda cifrada con SHA-256). */
+  function huellaClave(nombre, clave) {
+    if (!(window.crypto && crypto.subtle && window.TextEncoder)) return Promise.resolve('');
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode('presentismo|' + sinAcentos(nombre) + '|' + clave)).then(function (b) {
+      return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
+  }
+  function guardarIngreso(r, clave) {
+    huellaClave(r.nombre, clave).then(function (h) {
+      if (!h) return;
+      var todos = {};
+      try { todos = JSON.parse(localStorage.getItem('presentismo_ingresos') || '{}'); } catch (e) {}
+      todos[sinAcentos(r.nombre)] = { huella: h, datos: r, guardado: Date.now() };
+      try { localStorage.setItem('presentismo_ingresos', JSON.stringify(todos)); } catch (e) {}
+    });
+  }
+  function ingresoGuardado(nombre, clave) {
+    var todos = {};
+    try { todos = JSON.parse(localStorage.getItem('presentismo_ingresos') || '{}'); } catch (e) {}
+    var g = todos[sinAcentos(nombre)];
+    if (!g || Date.now() - g.guardado > 30 * 86400000) return Promise.resolve(null);   // vale 30 días
+    return huellaClave(nombre, clave).then(function (h) { return h && h === g.huella ? g.datos : null; });
+  }
+
+  /* ============================================================
+     v5.7 · COLA DE REPORTES SIN SEÑAL
+     Si no hay internet o el sistema está saturado, el reporte se
+     guarda en el teléfono y se envía solo apenas se pueda:
+     - al volver la señal, al abrir la app y cada 1 minuto con la app abierta;
+     - en Android, además, aunque la app esté cerrada (Background Sync).
+     Cada reporte lleva un ID único: aunque se envíe dos veces, la
+     planilla lo guarda UNA sola vez.
+     ------------------------------------------------------------ */
+  var COLA_DB = 'presentismo', COLA_STORE = 'cola';
+  var colaEnviando = false;
+
+  function colaAbrir() {
+    return new Promise(function (ok, mal) {
+      if (!('indexedDB' in window)) { mal(new Error('Sin IndexedDB')); return; }
+      var req = indexedDB.open(COLA_DB, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore(COLA_STORE, { keyPath: 'id' }); };
+      req.onsuccess = function () { ok(req.result); };
+      req.onerror = function () { mal(req.error); };
+    });
+  }
+  function colaOp(modo, fn) {
+    return colaAbrir().then(function (db) {
+      return new Promise(function (ok, mal) {
+        var tx = db.transaction(COLA_STORE, modo), st = tx.objectStore(COLA_STORE), res;
+        res = fn(st);
+        tx.oncomplete = function () { ok(res && 'result' in res ? res.result : undefined); db.close(); };
+        tx.onerror = function () { mal(tx.error); db.close(); };
+      });
+    });
+  }
+  /* Respaldo en localStorage si el teléfono no permite IndexedDB */
+  function colaLS() { try { return JSON.parse(localStorage.getItem('presentismo_cola') || '[]'); } catch (e) { return []; } }
+  function colaLSGuardar(l) { try { localStorage.setItem('presentismo_cola', JSON.stringify(l)); } catch (e) {} }
+
+  function colaTodos() {
+    return colaOp('readonly', function (st) { return st.getAll(); }).catch(function () { return colaLS(); });
+  }
+  function colaGuardar(item) {
+    return colaOp('readwrite', function (st) { st.put(item); }).catch(function () {
+      var l = colaLS().filter(function (x) { return x.id !== item.id; }); l.push(item); colaLSGuardar(l);
+    });
+  }
+  function colaBorrar(id) {
+    return colaOp('readwrite', function (st) { st.delete(id); }).catch(function () {
+      colaLSGuardar(colaLS().filter(function (x) { return x.id !== id; }));
+    });
+  }
+
+  /** Guarda el reporte en el teléfono y pide al sistema que lo envíe apenas haya señal. */
+  function encolar(envio, vista) {
+    var item = { id: envio.idReporte, envio: envio, vista: vista, url: API_URL, creado: Date.now(), intentos: 0, estado: 'pendiente', error: '' };
+    return colaGuardar(item).then(function () {
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        navigator.serviceWorker.ready.then(function (reg) { return reg.sync.register('enviar-cola'); }).catch(function () {});
+      }
+      pintarCola();
+    });
+  }
+
+  /** Intenta enviar todos los reportes guardados, de a uno. */
+  function procesarCola() {
+    if (colaEnviando || (navigator.onLine === false)) return Promise.resolve();
+    colaEnviando = true;
+    return colaTodos().then(function (lista) {
+      var pendientes = lista.filter(function (x) { return x.estado === 'pendiente'; }).sort(function (a, b) { return a.creado - b.creado; });
+      var cadena = Promise.resolve();
+      pendientes.forEach(function (item) {
+        cadena = cadena.then(function () {
+          return llamar('guardarRegistro', item.envio).then(function (r) {
+            if (r && r.ok) {
+              return colaBorrar(item.id).then(function () { avisoCola('✅ Se envió el reporte guardado: ' + item.vista.servicio + ' · ' + item.vista.turno + ' · ' + item.vista.fechaLinda, 'ok'); });
+            }
+            if (r && r.reintentar) { item.intentos++; return colaGuardar(item); }
+            item.estado = 'rechazado'; item.error = (r && r.mensaje) || 'No se pudo guardar.';
+            return colaGuardar(item);
+          }).catch(function (e) {
+            item.intentos++; item.error = errorTexto(e);
+            return colaGuardar(item);
+          });
+        });
+      });
+      return cadena;
+    }).catch(function () {}).then(function () { colaEnviando = false; pintarCola(); });
+  }
+
+  /** Cartel fijo arriba: cuántos reportes esperan señal y si alguno fue rechazado. */
+  function pintarCola() {
+    colaTodos().then(function (lista) {
+      var caja = $('colaAviso');
+      if (!caja) {
+        caja = document.createElement('div'); caja.id = 'colaAviso'; caja.setAttribute('role', 'status');
+        var wrap = $('wrap'); wrap.parentNode.insertBefore(caja, wrap);
+      }
+      var pend = lista.filter(function (x) { return x.estado === 'pendiente'; });
+      var rech = lista.filter(function (x) { return x.estado === 'rechazado'; });
+      caja.replaceChildren();
+      if (!pend.length && !rech.length) { caja.className = 'oculto'; return; }
+      caja.className = 'cola-aviso' + (rech.length ? ' cola-mal' : '');
+      var p = document.createElement('p');
+      if (pend.length) {
+        p.textContent = '📱 ' + (pend.length === 1 ? 'Tenés 1 reporte guardado en el teléfono' : 'Tenés ' + pend.length + ' reportes guardados en el teléfono') +
+          '. Se envía' + (pend.length === 1 ? '' : 'n') + ' solo' + (pend.length === 1 ? '' : 's') + ' cuando haya señal. No borres la app.';
+        caja.appendChild(p);
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = 'Enviar ahora';
+        b.onclick = function () { b.disabled = true; b.textContent = 'Enviando…'; procesarCola(); };
+        caja.appendChild(b);
+      }
+      rech.forEach(function (x) {
+        var q = document.createElement('p');
+        q.textContent = '⚠️ No se pudo guardar el reporte de ' + x.vista.servicio + ' · ' + x.vista.turno + ' · ' + x.vista.fechaLinda + ': ' + x.error + ' Cargalo de nuevo o avisá a RRHH.';
+        caja.appendChild(q);
+        var d = document.createElement('button'); d.type = 'button'; d.className = 'btn sec'; d.textContent = 'Entendido, quitar este aviso';
+        d.onclick = function () { colaBorrar(x.id).then(pintarCola); };
+        caja.appendChild(d);
+      });
+    });
+  }
+
+  function avisoCola(texto, tipo) {
+    var t = document.createElement('div'); t.className = 'msg ' + (tipo || 'ok') + ' cola-toast'; t.textContent = texto;
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 6000);
+  }
+
+  /** Pantalla final cuando el reporte quedó guardado en el teléfono (sin señal o sistema saturado). */
+  function mostrarGuardadoSinSenal(vista) {
+    sinGuardar = false;
+    S.idEnvio = null;
+    var cab = document.querySelector('#vOk .msg');
+    if (cab) { cab.className = 'msg aviso'; cab.textContent = '📱 Sin señal: el reporte quedó GUARDADO en el teléfono'; }
+    pintarTabla('okTabla', filasResumen(vista), vista.diferencia);
+    $('okEmail').textContent = 'Se va a enviar solo apenas haya internet (no hace falta que lo cargues de nuevo). Podés seguir con otro turno o servicio.';
+    $('okWa').replaceChildren();
+    ver('vOk');
+  }
+
+  /* Cuándo se intenta enviar la cola */
+  window.addEventListener('online', function () { procesarCola(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') procesarCola(); });
+  setInterval(function () { procesarCola(); }, 60000);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      if (e.data && e.data.tipo === 'cola-enviada') { avisoCola('✅ Se envió el reporte guardado: ' + e.data.texto, 'ok'); pintarCola(); }
+      if (e.data && e.data.tipo === 'cola-cambio') pintarCola();
+    });
+  }
 </script>
 </body>
 </html>
