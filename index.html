@@ -667,7 +667,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
 </div>
 
 <script>
-  /* PRESENTISMO v5.9 (correos para tildar desde Correos Apps + contador de cupo) · v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
+  /* PRESENTISMO v5.9.1 (lista única de correos, nada pre-tildado) · v5.9 (correos para tildar desde Correos Apps + contador de cupo) · v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
   var D = null;
   var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor', perfil: '', perfilTexto: '', accesoTotal: false, sinServicios: false };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
@@ -1711,6 +1711,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
   function claveCorreos() { return 'presentismo_correos_' + sinAcentos(S.servicio || ''); }
 
   function pintarCorreos() {
+    // v5.9.1 · Una sola lista (sin "sugeridos"): nada viene tildado; se recuerda lo tildado la última vez en cada servicio
     var caja = $('correosBox');
     if (!caja) {
       caja = document.createElement('div'); caja.id = 'correosBox'; caja.className = 'correos';
@@ -1733,45 +1734,34 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
       caja.appendChild(sin);
     }
     var mios = (S.emails || []).map(function (e) { return String(e).toLowerCase(); });
-    var serv = sinAcentos(S.servicio || '');
-    var esSugerido = function (c) { var l = c.servicios || []; return l.indexOf('TODOS') >= 0 || l.indexOf(serv) >= 0 || mios.indexOf(c.email.toLowerCase()) >= 0; };
-    var lista = (D.correos || []).slice();
-    var sug = lista.filter(esSugerido).sort(function (a, b) { return (a.sector + a.nombre).localeCompare(b.sector + b.nombre); });
-    var otros = lista.filter(function (c) { return !esSugerido(c); }).sort(function (a, b) { return (a.sector + a.nombre).localeCompare(b.sector + b.nombre); });
-
+    var esMio = function (c) { return mios.indexOf(c.email.toLowerCase()) >= 0; };
+    // Primero vos; después ordenados por sector y nombre
+    var lista = (D.correos || []).slice().sort(function (a, b) {
+      return (esMio(b) - esMio(a)) || (a.sector + a.nombre).localeCompare(b.sector + b.nombre);
+    });
     var guardado = null;
     try { guardado = JSON.parse(localStorage.getItem(claveCorreos()) || 'null'); } catch (e) {}
-    var tildado = function (c) { return guardado ? guardado.indexOf(c.email.toLowerCase()) >= 0 : esSugerido(c); };
+    var tildado = function (c) { return !!guardado && guardado.indexOf(c.email.toLowerCase()) >= 0; };
 
-    var fila = function (c) {
+    if (lista.length > 8) {
+      var b = document.createElement('input'); b.type = 'search'; b.placeholder = '🔎 Buscar nombre o sector…'; b.className = 'correos-buscar';
+      b.oninput = function () {
+        var q = sinAcentos(b.value.trim());
+        Array.prototype.forEach.call(caja.querySelectorAll('label.correo'), function (l) { l.classList.toggle('oculto', !!q && sinAcentos(l.textContent).indexOf(q) < 0); });
+      };
+      caja.appendChild(b);
+    }
+    lista.forEach(function (c) {
       var l = document.createElement('label'); l.className = 'correo';
       var ch = document.createElement('input'); ch.type = 'checkbox'; ch.value = c.email; ch.checked = tildado(c);
       ch.onchange = contarCorreos;
       var t = document.createElement('span');
-      var yo = mios.indexOf(c.email.toLowerCase()) >= 0;
-      t.textContent = (c.nombre || c.email) + (yo ? ' (vos · copia para vos)' : '');
+      t.textContent = (c.nombre || c.email) + (esMio(c) ? ' (vos · copia para vos)' : '');
       var s = document.createElement('small'); s.textContent = c.sector || '';
       t.appendChild(document.createElement('br')); t.appendChild(s);
       l.appendChild(ch); l.appendChild(t);
-      return l;
-    };
-    var titulo = function (txt) { var s = document.createElement('div'); s.className = 'correos-sector'; s.textContent = txt; caja.appendChild(s); };
-    if (sug.length) { titulo('⭐ Sugeridos para este servicio'); sug.forEach(function (c) { caja.appendChild(fila(c)); }); }
-    if (otros.length) {
-      var det = document.createElement('details'); det.className = 'correos-otros';
-      var sm = document.createElement('summary'); sm.textContent = '➕ Otros contactos (' + otros.length + ')'; det.appendChild(sm);
-      if (otros.length > 8) {
-        var b = document.createElement('input'); b.type = 'search'; b.placeholder = 'Buscar nombre o sector…'; b.className = 'correos-buscar';
-        b.oninput = function () {
-          var q = sinAcentos(b.value.trim());
-          Array.prototype.forEach.call(det.querySelectorAll('label.correo'), function (l) { l.classList.toggle('oculto', !!q && sinAcentos(l.textContent).indexOf(q) < 0); });
-        };
-        det.appendChild(b);
-      }
-      otros.forEach(function (c) { det.appendChild(fila(c)); });
-      if (otros.some(tildado)) det.open = true;
-      caja.appendChild(det);
-    }
+      caja.appendChild(l);
+    });
     var cont = document.createElement('div'); cont.id = 'correosCont'; cont.className = 'control neutro';
     caja.appendChild(cont);
     contarCorreos();
