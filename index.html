@@ -349,6 +349,14 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
   .correos details.correos-otros { margin-top:10px; }
   .correos details.correos-otros summary { min-height:48px; display:flex; align-items:center; font-weight:800; color:var(--azul2); cursor:pointer; }
   .correos .correos-buscar { margin:6px 0; }
+  /* v6.0 · Cómo se manda el reporte + mandarlo desde el correo propio */
+  .modo-correo { display:grid; gap:8px; margin:6px 0 10px; }
+  .modo-op { text-align:left; padding:12px 14px; border:2px solid #c9d6e6; border-radius:14px; background:#f7f9fc; color:var(--azul); font-size:16px; min-height:64px; cursor:pointer; }
+  .modo-op small { font-weight:400; color:var(--suave); font-size:13px; }
+  .modo-op.sel { border-color:var(--azul2); background:#e7f0fa; box-shadow:0 0 0 3px rgba(46,106,163,.15); }
+  .micorreo { margin-top:14px; padding:12px; border:2px solid #9db4cf; border-radius:16px; background:#fff; display:grid; gap:10px; }
+  .micorreo h3 { margin:0; font-size:17px; color:var(--azul); }
+  .micorreo .btn { width:100%; }
 </style>
 </head>
 <body>
@@ -667,7 +675,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
 </div>
 
 <script>
-  /* PRESENTISMO v5.9.1 (lista única de correos, nada pre-tildado) · v5.9 (correos para tildar desde Correos Apps + contador de cupo) · v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
+  /* PRESENTISMO v6.0 (elegir: lo manda el sistema o desde mi correo Gmail/Outlook/celular) · v5.9.1 (lista única de correos, nada pre-tildado) · v5.9 (correos para tildar desde Correos Apps + contador de cupo) · v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
   var D = null;
   var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor', perfil: '', perfilTexto: '', accesoTotal: false, sinServicios: false };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
@@ -1357,7 +1365,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     // ID único del reporte: si se reenvía (mala señal), la planilla no lo duplica
     if (!S.idEnvio) { S.idEnvio = nuevoId(); S.cargadoEn = new Date().toISOString(); }
     d.envio.idReporte = S.idEnvio;
-    d.envio.cargadoEn = S.cargadoEn; d.envio.correos = correosElegidos();
+    d.envio.cargadoEn = S.cargadoEn; d.envio.correos = correosParaSistema(d.vista);
     var btn = $('btnEnviar'), btnEd = $('btnEditar');
     var terminar = function () { btn.disabled = false; btn.textContent = 'Confirmar y enviar reporte'; btnEd.disabled = false; };
     var guardarEnTelefono = function () {
@@ -1778,16 +1786,345 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
   function contarCorreos() {
     var cont = $('correosCont'); if (!cont) return;
     var tild = $('correosBox').querySelectorAll('label.correo input:checked').length;
-    var usa = (D.correosAuto || []).length + tild;
+    var yo = typeof modoCorreo === 'function' && modoCorreo() === 'yo';
+    var usa = (D.correosAuto || []).length + (yo ? 0 : tild);
     var quedan = typeof D.cupo === 'number' ? D.cupo : null;
     cont.replaceChildren();
-    var bt = document.createElement('b'); bt.textContent = '📊 Este reporte usa ' + usa + ' correo' + (usa === 1 ? '' : 's');
+    var bt = document.createElement('b');
+    bt.textContent = '📊 El sistema usa ' + usa + ' correo' + (usa === 1 ? '' : 's') + ' del cupo' + (yo && tild ? ' (a los ' + tild + ' tildados se lo mandás vos)' : '');
     var sm = document.createElement('small');
     sm.textContent = quedan === null ? 'Cupo de hoy: se ve cuando hay señal.' : 'Quedan ' + quedan + ' correos para hoy en todo el sistema.';
     cont.appendChild(bt); cont.appendChild(sm);
     cont.className = 'control ' + (quedan !== null && usa > quedan ? 'mal' : (quedan !== null && quedan < 100 ? 'ambar' : 'neutro'));
-    if (quedan !== null && usa > quedan) sm.textContent += ' No alcanza: el reporte se guarda igual, pero sin correo. Avisá a RRHH.';
+    if (quedan !== null && usa > quedan) sm.textContent += ' No alcanza: elegí "Lo mando yo desde mi correo".';
   }
+  /* ============================================================
+     v6.0 · ¿CÓMO SE MANDA EL REPORTE?
+     - "Lo manda el sistema": los tildados lo reciben con el formato de siempre
+       (gasta cupo del sistema).
+     - "Lo mando yo desde mi correo": el sistema SOLO lo manda a las cuentas
+       AUTOMÁTICAS (grupos por sector). Después se abre Gmail / Outlook / el
+       correo del celular con el reporte armado (no gasta cupo del sistema).
+     - Siempre, en la pantalla final, se puede mandar también desde el correo propio.
+     ------------------------------------------------------------ */
+  var CLAVE_MODO_CORREO = 'presentismo_modo_correo';
+  function modoCorreo() {
+    if (!S.modoCorreo) { try { S.modoCorreo = localStorage.getItem(CLAVE_MODO_CORREO) || 'sistema'; } catch (e) { S.modoCorreo = 'sistema'; } }
+    return S.modoCorreo;
+  }
+  function elegirModoCorreo(m) {
+    S.modoCorreo = m;
+    try { localStorage.setItem(CLAVE_MODO_CORREO, m); } catch (e) {}
+    pintarModoCorreo();
+    contarCorreos();
+  }
+  function pintarModoCorreo() {
+    var caja = $('correosBox'); if (!caja) return;
+    var box = $('modoCorreo');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'modoCorreo'; box.className = 'modo-correo';
+      var h = caja.querySelector('h3');
+      caja.insertBefore(box, h ? h.nextSibling : caja.firstChild);
+    }
+    box.replaceChildren();
+    var m = modoCorreo();
+    [['sistema', '🤖 Lo manda el sistema', 'Llega con el formato de siempre a los que tildes.'],
+     ['yo', '📧 Lo mando yo desde mi correo', 'Se abre Gmail / Outlook con el reporte armado. Vos elegís a quién.']].forEach(function (o) {
+      var b = document.createElement('button'); b.type = 'button';
+      b.className = 'modo-op' + (m === o[0] ? ' sel' : '');
+      b.setAttribute('aria-pressed', m === o[0] ? 'true' : 'false');
+      var t = document.createElement('b'); t.textContent = (m === o[0] ? '✔ ' : '') + o[1];
+      var s = document.createElement('small'); s.textContent = o[2];
+      b.appendChild(t); b.appendChild(document.createElement('br')); b.appendChild(s);
+      b.onclick = function () { elegirModoCorreo(o[0]); };
+      box.appendChild(b);
+    });
+    var lista = caja.querySelectorAll('label.correo');
+    var ayuda = $('modoAyuda');
+    if (!ayuda) { ayuda = document.createElement('p'); ayuda.id = 'modoAyuda'; ayuda.className = 'ayuda'; box.parentNode.insertBefore(ayuda, box.nextSibling); }
+    ayuda.textContent = m === 'yo'
+      ? '👇 Tildá a quién se lo vas a mandar: sus correos quedan cargados cuando se abra tu correo.'
+      : '👇 Tildá a quién se lo manda el sistema.';
+  }
+  /** Lo que va al servidor: en modo "yo" el sistema no manda a los tildados (solo a las AUTOMÁTICAS). */
+  function correosParaSistema(vista) {
+    var tild = correosElegidos();
+    S.ultimoReporte = { vista: vista, para: tild, modo: modoCorreo() };
+    return modoCorreo() === 'yo' ? [] : tild;
+  }
+
+  /* ---------- Armado del reporte (mismas filas que la tabla de la app) ---------- */
+  function datosDelReporte() {
+    var u = S.ultimoReporte || {}, v = u.vista || {};
+    var crudas = [];
+    try { crudas = filasResumen(v) || []; } catch (e) { crudas = []; }
+    var meta = {}, filas = [];
+    var num = function (x) { var n = parseFloat(String(x == null ? '' : x).replace(',', '.')); return isNaN(n) ? 0 : n; };
+    crudas.forEach(function (f) {
+      var et = String(f[0] || ''), val = f[1] == null || f[1] === '' ? '0' : String(f[1]);
+      var k = et.toUpperCase();
+      if (/^CLIENTE|^FECHA$|^TURNO$|^OBSERVACIONES$|^FIRMA$/.test(k)) { meta[k.split(' ')[0]] = val; return; }
+      var tono = '';
+      if (/^DIFERENCIA/.test(k)) tono = num(v.diferencia) < 0 ? 'mal' : (num(v.diferencia) > 0 ? 'ambar' : 'ok');
+      else if (/^FALTANTE REAL/.test(k)) tono = num(val) > 0 ? 'mal' : 'ok';
+      else if (/^AUSENTES/.test(k) && num(val) > 0) tono = 'ambar';
+      filas.push({ c: [et, val], cls: '', tono: tono });
+    });
+    var servicio = meta.CLIENTE || v.servicio || S.servicio || '';
+    var turno = meta.TURNO || v.turno || S.turno || '';
+    var fecha = meta.FECHA || v.fechaLinda || v.fecha || '';
+    var obs = meta.OBSERVACIONES && meta.OBSERVACIONES !== '—' ? meta.OBSERVACIONES : '';
+    return {
+      servicio: servicio, turno: turno, fecha: fecha,
+      firma: meta.FIRMA || v.responsable || S.nombre || '',
+      obs: obs,
+      filas: filas,
+      para: (u.para || []).slice(),
+      asunto: 'Presentismo · ' + servicio + ' · ' + (v.turno || turno) + (fecha ? ' · ' + fecha : '')
+    };
+  }
+  function tonoFila(f) {
+    if (f.tono !== undefined) return f.tono;
+    var txt = f.c.join(' ').toUpperCase(), cls = f.cls || '';
+    if (/\bmal\b|rojo|falta|negativ/.test(cls)) return 'mal';
+    if (/ambar|aviso|amarill/.test(cls)) return 'ambar';
+    if (/\bok\b|verde|bien/.test(cls)) return 'ok';
+    if (/DIFERENCIA/.test(txt)) {
+      var n = parseFloat((f.c[f.c.length - 1] || '').replace(/[^\d\-+.,]/g, '').replace(',', '.'));
+      if (!isNaN(n)) return n < 0 ? 'mal' : (n > 0 ? 'ambar' : 'ok');
+    }
+    return '';
+  }
+  function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /** HTML para pegar en Gmail / Outlook (estilos en línea, tabla de 600 px: se ve bien en PC y celular). */
+  function htmlDelReporte(r) {
+    var col = { mal: ['#fdecea', '#b42318'], ambar: ['#fff4e0', '#9a5b00'], ok: ['#e8f6ee', '#157a3d'] };
+    var filas = r.filas.map(function (f, i) {
+      var tono = col[tonoFila(f)];
+      var bg = tono ? tono[0] : (i % 2 ? '#f6f8fb' : '#ffffff');
+      var fg = tono ? tono[1] : '#1d2733';
+      var celdas = f.c.map(function (x, j) {
+        var ult = j === f.c.length - 1 && f.c.length > 1;
+        return '<td style="padding:9px 12px;border-bottom:1px solid #e3e8ef;font-size:14px;color:' + fg + ';' +
+          (ult ? 'text-align:right;font-weight:700;' + (String(x).length < 18 ? 'white-space:nowrap;' : '') : (j === 0 ? 'font-weight:600;' : '')) + '">' + escH(x) + '</td>';
+      }).join('');
+      return '<tr style="background:' + bg + ';">' + celdas + '</tr>';
+    }).join('');
+    return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;border:1px solid #d5dde8;border-radius:10px;overflow:hidden;">' +
+      '<div style="background:#1f4e79;color:#ffffff;padding:14px 18px;">' +
+        '<div style="font-size:12px;letter-spacing:1px;opacity:.85;">☀️ LOS SOLES INTERNACIONAL S.A. · PRESENTISMO</div>' +
+        '<div style="font-size:20px;font-weight:700;margin-top:4px;">' + escH(r.servicio) + '</div>' +
+        '<div style="font-size:14px;margin-top:6px;">' +
+          '<span style="background:#ffffff;color:#1f4e79;border-radius:12px;padding:3px 10px;font-weight:700;margin-right:6px;">Turno ' + escH(r.turno) + '</span>' +
+          (r.fecha ? '<span style="background:#2e6aa3;color:#ffffff;border-radius:12px;padding:3px 10px;">📅 ' + escH(r.fecha) + '</span>' : '') +
+        '</div></div>' +
+      '<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">' + filas + '</table>' +
+      (r.obs ? '<div style="padding:12px 18px;border-top:1px solid #e3e8ef;font-size:14px;color:#1d2733;"><b>📝 Observaciones:</b> ' + escH(r.obs) + '</div>' : '') +
+      '<div style="padding:10px 18px;background:#f6f8fb;font-size:12px;color:#5b6676;">' +
+        (r.firma ? '✍️ Firma: <b>' + escH(r.firma) + '</b> · ' : '') + 'Enviado desde la app Presentismo</div>' +
+    '</div>';
+  }
+  /** Texto simple prolijo (para el cuerpo cuando no se puede pegar con formato). */
+  function textoDelReporte(r, max) {
+    var L = [];
+    L.push('☀️ LOS SOLES INTERNACIONAL · PRESENTISMO');
+    L.push('━━━━━━━━━━━━━━━━━━━━━━');
+    L.push('🏢 ' + r.servicio);
+    L.push('🕒 Turno ' + r.turno + (r.fecha ? '   📅 ' + r.fecha : ''));
+    L.push('━━━━━━━━━━━━━━━━━━━━━━');
+    r.filas.forEach(function (f) {
+      var t = tonoFila(f), ic = t === 'mal' ? '🔴 ' : t === 'ambar' ? '🟠 ' : t === 'ok' ? '🟢 ' : '▫️ ';
+      L.push(ic + (f.c.length > 1 ? f.c.slice(0, -1).join(' · ') + ': ' + f.c[f.c.length - 1] : f.c[0]));
+    });
+    if (r.obs) { L.push(''); L.push('📝 Observaciones: ' + r.obs); }
+    L.push('');
+    if (r.firma) L.push('✍️ Firma: ' + r.firma);
+    L.push('Enviado desde la app Presentismo');
+    var s = L.join('\n');
+    if (max && s.length > max) s = s.slice(0, max - 30) + '\n… (ver imagen / reporte completo)';
+    return s;
+  }
+  /** Imagen PNG del reporte (para compartir desde el celular). Se dibuja sin librerías. */
+  function imagenDelReporte(r) {
+    return new Promise(function (ok) {
+      var W = 1080, P = 48, esc = 1;
+      var c = document.createElement('canvas'), g = c.getContext('2d');
+      var fuente = function (px, peso) { return (peso || 'normal') + ' ' + px + 'px Arial, Helvetica, sans-serif'; };
+      var cortar = function (txt, ancho, f) {
+        g.font = f; var pal = String(txt).split(' '), l = [], a = '';
+        pal.forEach(function (p) { var t = a ? a + ' ' + p : p; if (g.measureText(t).width > ancho && a) { l.push(a); a = p; } else a = t; });
+        if (a) l.push(a); return l.length ? l : [''];
+      };
+      // Calcular alto
+      var filasL = r.filas.map(function (f) {
+        var izq = f.c.length > 1 ? f.c.slice(0, -1).join(' · ') : f.c[0], der = f.c.length > 1 ? f.c[f.c.length - 1] : '';
+        g.font = fuente(34, 'bold'); var wd = der ? g.measureText(der).width + 24 : 0;
+        if (wd > (W - 2 * P) * 0.45) { izq = izq + ': ' + der; der = ''; wd = 0; }
+        var li = cortar(izq, W - 2 * P - 40 - wd, fuente(32, '600'));
+        return { li: li, der: der, tono: tonoFila(f), h: Math.max(76, 28 + li.length * 42) };
+      });
+      var obsL = r.obs ? cortar('📝 Observaciones: ' + r.obs, W - 2 * P - 40, fuente(30)) : [];
+      var H = 250 + filasL.reduce(function (a, f) { return a + f.h; }, 0) + (obsL.length ? obsL.length * 40 + 50 : 0) + 110;
+      c.width = W * esc; c.height = H * esc;
+      // Fondo
+      g.fillStyle = '#eef2f7'; g.fillRect(0, 0, W, H);
+      g.fillStyle = '#ffffff'; g.fillRect(24, 24, W - 48, H - 48);
+      // Encabezado
+      g.fillStyle = '#1f4e79'; g.fillRect(24, 24, W - 48, 210);
+      g.fillStyle = '#cfe0f1'; g.font = fuente(26, 'bold'); g.fillText('☀️ LOS SOLES INTERNACIONAL S.A. · PRESENTISMO', P + 8, 80);
+      g.fillStyle = '#ffffff'; g.font = fuente(46, 'bold');
+      var ts = cortar(r.servicio, W - 2 * P - 16, fuente(46, 'bold'))[0]; g.fillText(ts, P + 8, 140);
+      var px = P + 8, pill = function (txt, bg, fg) {
+        g.font = fuente(28, 'bold'); var w = g.measureText(txt).width + 40;
+        g.fillStyle = bg; g.beginPath();
+        if (g.roundRect) g.roundRect(px, 162, w, 50, 25); else g.rect(px, 162, w, 50);
+        g.fill(); g.fillStyle = fg; g.fillText(txt, px + 20, 197); px += w + 14;
+      };
+      pill('Turno ' + r.turno, '#ffffff', '#1f4e79');
+      if (r.fecha) pill('📅 ' + r.fecha, '#2e6aa3', '#ffffff');
+      // Filas
+      var y = 234, col = { mal: ['#fdecea', '#b42318'], ambar: ['#fff4e0', '#9a5b00'], ok: ['#e8f6ee', '#157a3d'] };
+      filasL.forEach(function (f, i) {
+        var tn = col[f.tono];
+        g.fillStyle = tn ? tn[0] : (i % 2 ? '#f6f8fb' : '#ffffff'); g.fillRect(24, y, W - 48, f.h);
+        g.fillStyle = '#e3e8ef'; g.fillRect(24, y + f.h - 2, W - 48, 2);
+        var fg = tn ? tn[1] : '#1d2733';
+        g.fillStyle = fg; g.font = fuente(32, '600');
+        var y0 = y + (f.h - f.li.length * 42) / 2 + 32;
+        f.li.forEach(function (l, k) { g.fillText(l, P + 12, y0 + k * 42); });
+        if (f.der) { g.font = fuente(34, 'bold'); g.textAlign = 'right'; g.fillText(f.der, W - P - 12, y + f.h / 2 + 12); g.textAlign = 'left'; }
+        y += f.h;
+      });
+      if (obsL.length) {
+        y += 24; g.fillStyle = '#1d2733'; g.font = fuente(30);
+        obsL.forEach(function (l) { y += 40; g.fillText(l, P + 12, y); }); y += 10;
+      }
+      g.fillStyle = '#f6f8fb'; g.fillRect(24, H - 110, W - 48, 86);
+      g.fillStyle = '#5b6676'; g.font = fuente(26);
+      g.fillText((r.firma ? '✍️ Firma: ' + r.firma + ' · ' : '') + 'Enviado desde la app Presentismo', P + 12, H - 58);
+      c.toBlob(function (b) { ok(b); }, 'image/png');
+    });
+  }
+
+  /* ---------- Copiar con formato y abrir el correo ---------- */
+  function copiarReporte(r) {
+    var html = htmlDelReporte(r), txt = textoDelReporte(r);
+    var viejo = function () {
+      try {
+        var d = document.createElement('div'); d.contentEditable = 'true'; d.innerHTML = html;
+        d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;'; document.body.appendChild(d);
+        var rg = document.createRange(); rg.selectNodeContents(d);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+        var ok = document.execCommand('copy'); sel.removeAllRanges(); d.remove(); return ok;
+      } catch (e) { return false; }
+    };
+    if (navigator.clipboard && window.ClipboardItem) {
+      return navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([txt], { type: 'text/plain' })
+      })]).then(function () { return true; }).catch(function () { return viejo(); });
+    }
+    return Promise.resolve(viejo());
+  }
+  function copiarTexto(t) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function () { return true; }).catch(function () { return false; });
+    return Promise.resolve(false);
+  }
+  function abrirCorreo(tipo) {
+    var r = datosDelReporte();
+    var to = r.para.join(','), su = encodeURIComponent(r.asunto);
+    var aviso = $('miCorreoAviso');
+    var decir = function (t, cls) { if (aviso) { aviso.className = 'msg ' + (cls || 'ok'); aviso.textContent = t; aviso.classList.remove('oculto'); } };
+    if (tipo === 'compartir') {
+      // Celular: se comparte la IMAGEN del reporte; los correos tildados quedan copiados para pegarlos en "Para".
+      var listo = to ? copiarTexto(r.para.join(', ')) : Promise.resolve(false);
+      return listo.then(function (copiados) {
+        return imagenDelReporte(r).then(function (blob) {
+          var f = new File([blob], 'Presentismo ' + r.servicio.replace(/[\\/:*?"<>|]/g, '') + ' ' + r.turno + '.png', { type: 'image/png' });
+          var datos = { title: r.asunto, text: r.asunto + '\n\n' + textoDelReporte(r, 1500), files: [f] };
+          if (navigator.canShare && navigator.canShare({ files: [f] })) {
+            if (copiados) decir('📋 Los correos que tildaste ya están copiados: en "Para", mantené apretado y tocá "Pegar".');
+            return navigator.share(datos).catch(function () {});
+          }
+          abrirCorreo('mailto');
+        });
+      });
+    }
+    if (tipo === 'mailto') {
+      var cuerpo = encodeURIComponent(textoDelReporte(r, 1600));
+      location.href = 'mailto:' + encodeURIComponent(to).replace(/%2C/g, ',').replace(/%40/g, '@') + '?subject=' + su + '&body=' + cuerpo;
+      return;
+    }
+    if (tipo === 'imagen') {
+      return imagenDelReporte(r).then(function (blob) {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'Presentismo ' + r.servicio.replace(/[\\/:*?"<>|]/g, '') + ' ' + r.turno + '.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        decir('⬇️ Imagen descargada: adjuntala en el correo.');
+      });
+    }
+    // PC: se copia el reporte CON FORMATO y se abre el correo; la persona pega con Ctrl+V.
+    var ventana = window.open('about:blank', '_blank');
+    copiarReporte(r).then(function (copiado) {
+      var cuerpo = copiado ? '' : encodeURIComponent(textoDelReporte(r, 1600));
+      var url = tipo === 'outlook'
+        ? 'https://outlook.office.com/mail/deeplink/compose?to=' + encodeURIComponent(to) + '&subject=' + su + '&body=' + cuerpo
+        : 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(to) + '&su=' + su + '&body=' + cuerpo;
+      if (ventana) ventana.location.href = url; else window.open(url, '_blank');
+      decir(copiado
+        ? '📋 El reporte ya está copiado CON FORMATO. En el correo que se abrió: hacé clic en el cuerpo del mensaje y apretá Ctrl + V. Después tocá Enviar.'
+        : 'Se abrió el correo con el reporte en texto. Revisalo y tocá Enviar.');
+    });
+  }
+  function pintarMiCorreo() {
+    var vOk = $('vOk'); if (!vOk || !S.ultimoReporte) return;
+    var box = $('miCorreoBox');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'miCorreoBox'; box.className = 'micorreo';
+      var ref = $('okWa') || $('okEmail');
+      if (ref && ref.parentNode) ref.parentNode.insertBefore(box, ref.nextSibling); else vOk.appendChild(box);
+    }
+    box.replaceChildren();
+    var yo = S.ultimoReporte.modo === 'yo';
+    var h = document.createElement('h3');
+    h.textContent = yo ? '📧 Ahora mandalo desde tu correo' : '📧 ¿Querés mandarlo también desde tu correo?';
+    box.appendChild(h);
+    if (yo) {
+      var p = document.createElement('p'); p.className = 'ayuda';
+      p.textContent = S.ultimoReporte.para.length
+        ? 'Ya quedan cargados los ' + S.ultimoReporte.para.length + ' correo(s) que tildaste. Tocá un botón:'
+        : 'Tocá un botón y elegí a quién mandárselo:';
+      box.appendChild(p);
+    }
+    var movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    var boton = function (txt, tipo, cls) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || ''); b.textContent = txt;
+      b.onclick = function () { abrirCorreo(tipo); }; box.appendChild(b);
+    };
+    if (movil) {
+      boton('📤 Abrir mi correo con el reporte (imagen)', 'compartir', yo ? '' : 'sec');
+      boton('✉️ Correo en texto, con los destinatarios ya puestos', 'mailto', 'sec');
+    } else {
+      boton('📧 Abrir en Gmail', 'gmail', yo ? '' : 'sec');
+      boton('📨 Abrir en Outlook', 'outlook', 'sec');
+      boton('🖥️ Programa de correo de la PC', 'mailto', 'sec');
+      boton('⬇️ Descargar el reporte como imagen', 'imagen', 'sec');
+    }
+    var av = document.createElement('div'); av.id = 'miCorreoAviso'; av.className = 'msg ok oculto'; box.appendChild(av);
+  }
+  /* Al mostrar la pantalla final, se agregan los botones para mandarlo desde el correo propio */
+  var verOriginal_ = ver;
+  ver = function (id) {
+    verOriginal_.apply(this, arguments);
+    if (id === 'vOk') { try { pintarMiCorreo(); } catch (e) {} }
+  };
+  /* La lista de correos suma arriba la elección "sistema / mi correo" */
+  var pintarCorreosOriginal_ = pintarCorreos;
+  pintarCorreos = function () {
+    pintarCorreosOriginal_.apply(this, arguments);
+    try { pintarModoCorreo(); contarCorreos(); } catch (e) {}
+  };
 </script>
 </body>
 </html>
