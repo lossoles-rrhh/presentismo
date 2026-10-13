@@ -338,6 +338,17 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
 .cola-aviso p { margin:0 0 8px; }
 .cola-aviso .btn { margin-top:6px; }
 .cola-toast { position:fixed; left:12px; right:12px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:60; box-shadow:0 4px 14px rgba(0,0,0,.25) !important; font-weight:700; }
+  /* v5.9 · Lista de correos para tildar */
+  .correos { margin-top:14px; padding:12px; border:2px solid #9db4cf; border-radius:16px; background:#fff; }
+  .correos h3 { margin:0 0 8px; font-size:17px; color:var(--azul); }
+  .correos .correos-aviso { margin:0 0 8px; font-weight:700; }
+  .correos .correos-sector { margin:12px 0 4px; font-size:14px; font-weight:800; color:var(--azul2); }
+  .correos label.correo { display:flex; align-items:center; gap:12px; min-height:52px; padding:6px 4px; border-bottom:1px solid #eef1f5; font-size:16px; font-weight:700; cursor:pointer; }
+  .correos label.correo small { font-weight:400; color:var(--suave); font-size:13px; }
+  .correos label.correo input { width:28px; height:28px; min-height:0 !important; flex:0 0 auto; margin:0; -webkit-appearance:checkbox !important; appearance:auto !important; border:0 !important; box-shadow:none !important; }
+  .correos details.correos-otros { margin-top:10px; }
+  .correos details.correos-otros summary { min-height:48px; display:flex; align-items:center; font-weight:800; color:var(--azul2); cursor:pointer; }
+  .correos .correos-buscar { margin:6px 0; }
 </style>
 </head>
 <body>
@@ -656,7 +667,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
 </div>
 
 <script>
-  /* PRESENTISMO v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
+  /* PRESENTISMO v5.9 (correos para tildar desde Correos Apps + contador de cupo) · v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
   var D = null;
   var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor', perfil: '', perfilTexto: '', accesoTotal: false, sinServicios: false };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
@@ -1328,6 +1339,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     if (!d.ok) return;
     pintarTabla('revTabla', filasResumen(d.vista), d.vista.diferencia);
     msg('revMsg'); $('revDup').classList.add('oculto');
+    pintarCorreos();
     ver('vRevision');
     llamar('verificarDuplicado', d.envio.servicio, d.envio.fecha, d.envio.turno).then(function (n) {
       if (n > 0) {
@@ -1335,6 +1347,8 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
         $('revDup').classList.remove('oculto');
       }
     }).catch(function () {});
+    // Cupo de correos al día (si hay señal)
+    llamar('obtenerCupo').then(function (c) { if (c && typeof c.cupo === 'number') { D.cupo = c.cupo; contarCorreos(); } }).catch(function () {});
   }
 
   function enviar() {
@@ -1343,7 +1357,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     // ID único del reporte: si se reenvía (mala señal), la planilla no lo duplica
     if (!S.idEnvio) { S.idEnvio = nuevoId(); S.cargadoEn = new Date().toISOString(); }
     d.envio.idReporte = S.idEnvio;
-    d.envio.cargadoEn = S.cargadoEn;
+    d.envio.cargadoEn = S.cargadoEn; d.envio.correos = correosElegidos();
     var btn = $('btnEnviar'), btnEd = $('btnEditar');
     var terminar = function () { btn.disabled = false; btn.textContent = 'Confirmar y enviar reporte'; btnEd.disabled = false; };
     var guardarEnTelefono = function () {
@@ -1502,7 +1516,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     S.perfil = r.perfil || 'SUPERVISOR_REGULAR'; S.perfilTexto = r.perfilTexto || '';
     S.accesoTotal = !!r.accesoTotal;
     S.sinServicios = !!r.sinServicios || (!S.servicios.length && !S.accesoTotal);
-    S.dotaciones = r.dotaciones || {};
+    S.dotaciones = r.dotaciones || {}; S.emails = r.emails || [];
     if (r.hoy && D && r.hoy > (D.hoy || '')) D.hoy = r.hoy;
     try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
     $('hdrSup').textContent = r.nombre;
@@ -1684,6 +1698,105 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
       if (e.data && e.data.tipo === 'cola-enviada') { avisoCola('✅ Se envió el reporte guardado: ' + e.data.texto, 'ok'); pintarCola(); }
       if (e.data && e.data.tipo === 'cola-cambio') pintarCola();
     });
+  }
+  /* ============================================================
+     v5.9 · A QUIÉN SE ENVÍA EL REPORTE
+     - Las cuentas AUTOMÁTICAS (solapa Correos) lo reciben siempre.
+     - Quien firma tilda a quién más mandárselo (también su propia copia).
+     - Primero aparecen los SUGERIDOS para este servicio (RRHH, responsable
+       operativo, supervisor/coordinador), ya tildados la primera vez.
+     - Se recuerda lo tildado la última vez en cada servicio.
+     - Contador: cuántos correos usa este reporte y cuántos quedan hoy.
+     ------------------------------------------------------------ */
+  function claveCorreos() { return 'presentismo_correos_' + sinAcentos(S.servicio || ''); }
+
+  function pintarCorreos() {
+    var caja = $('correosBox');
+    if (!caja) {
+      caja = document.createElement('div'); caja.id = 'correosBox'; caja.className = 'correos';
+      $('revDup').parentNode.insertBefore(caja, $('revDup'));
+    }
+    caja.replaceChildren();
+    var h = document.createElement('h3'); h.textContent = '✉️ ¿A quién le mandás este reporte?'; caja.appendChild(h);
+    var aviso = document.createElement('div'); aviso.className = 'msg aviso correos-aviso';
+    aviso.textContent = '📣 Estás enviando un reporte de tu servicio ' + (S.servicio || '') + ', turno ' + (S.turno || '') +
+      '. Tildá a quién se lo mandás (supervisor, coordinador, RRHH…). Si querés una copia para vos, tildate también.';
+    caja.appendChild(aviso);
+    var fijos = (D.correosAuto || []).slice();
+    if (fijos.length) {
+      var p = document.createElement('p'); p.className = 'ayuda'; p.textContent = 'Siempre lo reciben: ' + fijos.join(', ') + '.';
+      caja.appendChild(p);
+    }
+    if (!D.correos) {
+      var sin = document.createElement('p'); sin.className = 'ayuda';
+      sin.textContent = 'La lista de correos se carga cuando hay señal. El reporte igual se guarda.';
+      caja.appendChild(sin);
+    }
+    var mios = (S.emails || []).map(function (e) { return String(e).toLowerCase(); });
+    var serv = sinAcentos(S.servicio || '');
+    var esSugerido = function (c) { var l = c.servicios || []; return l.indexOf('TODOS') >= 0 || l.indexOf(serv) >= 0 || mios.indexOf(c.email.toLowerCase()) >= 0; };
+    var lista = (D.correos || []).slice();
+    var sug = lista.filter(esSugerido).sort(function (a, b) { return (a.sector + a.nombre).localeCompare(b.sector + b.nombre); });
+    var otros = lista.filter(function (c) { return !esSugerido(c); }).sort(function (a, b) { return (a.sector + a.nombre).localeCompare(b.sector + b.nombre); });
+
+    var guardado = null;
+    try { guardado = JSON.parse(localStorage.getItem(claveCorreos()) || 'null'); } catch (e) {}
+    var tildado = function (c) { return guardado ? guardado.indexOf(c.email.toLowerCase()) >= 0 : esSugerido(c); };
+
+    var fila = function (c) {
+      var l = document.createElement('label'); l.className = 'correo';
+      var ch = document.createElement('input'); ch.type = 'checkbox'; ch.value = c.email; ch.checked = tildado(c);
+      ch.onchange = contarCorreos;
+      var t = document.createElement('span');
+      var yo = mios.indexOf(c.email.toLowerCase()) >= 0;
+      t.textContent = (c.nombre || c.email) + (yo ? ' (vos · copia para vos)' : '');
+      var s = document.createElement('small'); s.textContent = c.sector || '';
+      t.appendChild(document.createElement('br')); t.appendChild(s);
+      l.appendChild(ch); l.appendChild(t);
+      return l;
+    };
+    var titulo = function (txt) { var s = document.createElement('div'); s.className = 'correos-sector'; s.textContent = txt; caja.appendChild(s); };
+    if (sug.length) { titulo('⭐ Sugeridos para este servicio'); sug.forEach(function (c) { caja.appendChild(fila(c)); }); }
+    if (otros.length) {
+      var det = document.createElement('details'); det.className = 'correos-otros';
+      var sm = document.createElement('summary'); sm.textContent = '➕ Otros contactos (' + otros.length + ')'; det.appendChild(sm);
+      if (otros.length > 8) {
+        var b = document.createElement('input'); b.type = 'search'; b.placeholder = 'Buscar nombre o sector…'; b.className = 'correos-buscar';
+        b.oninput = function () {
+          var q = sinAcentos(b.value.trim());
+          Array.prototype.forEach.call(det.querySelectorAll('label.correo'), function (l) { l.classList.toggle('oculto', !!q && sinAcentos(l.textContent).indexOf(q) < 0); });
+        };
+        det.appendChild(b);
+      }
+      otros.forEach(function (c) { det.appendChild(fila(c)); });
+      if (otros.some(tildado)) det.open = true;
+      caja.appendChild(det);
+    }
+    var cont = document.createElement('div'); cont.id = 'correosCont'; cont.className = 'control neutro';
+    caja.appendChild(cont);
+    contarCorreos();
+  }
+
+  function correosElegidos() {
+    var caja = $('correosBox'); if (!caja) return [];
+    var l = Array.prototype.filter.call(caja.querySelectorAll('label.correo input'), function (x) { return x.checked; })
+      .map(function (x) { return x.value; });
+    try { localStorage.setItem(claveCorreos(), JSON.stringify(l.map(function (e) { return e.toLowerCase(); }))); } catch (e) {}
+    return l;
+  }
+
+  function contarCorreos() {
+    var cont = $('correosCont'); if (!cont) return;
+    var tild = $('correosBox').querySelectorAll('label.correo input:checked').length;
+    var usa = (D.correosAuto || []).length + tild;
+    var quedan = typeof D.cupo === 'number' ? D.cupo : null;
+    cont.replaceChildren();
+    var bt = document.createElement('b'); bt.textContent = '📊 Este reporte usa ' + usa + ' correo' + (usa === 1 ? '' : 's');
+    var sm = document.createElement('small');
+    sm.textContent = quedan === null ? 'Cupo de hoy: se ve cuando hay señal.' : 'Quedan ' + quedan + ' correos para hoy en todo el sistema.';
+    cont.appendChild(bt); cont.appendChild(sm);
+    cont.className = 'control ' + (quedan !== null && usa > quedan ? 'mal' : (quedan !== null && quedan < 100 ? 'ambar' : 'neutro'));
+    if (quedan !== null && usa > quedan) sm.textContent += ' No alcanza: el reporte se guarda igual, pero sin correo. Avisá a RRHH.';
   }
 </script>
 </body>
