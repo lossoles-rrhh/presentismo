@@ -347,6 +347,8 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
   .correos label.correo small { font-weight:400; color:var(--suave); font-size:13px; }
   .correos label.correo input { width:28px; height:28px; min-height:0 !important; flex:0 0 auto; margin:0; -webkit-appearance:checkbox !important; appearance:auto !important; border:0 !important; box-shadow:none !important; }
   .correos details.correos-otros { margin-top:10px; }
+  .correos label.correo.fijo { background:#f1f6fc; border-radius:10px; padding-left:8px; }
+  .correos label.correo.fijo input { opacity:.85; cursor:not-allowed; }
   .correos details.correos-otros summary { min-height:48px; display:flex; align-items:center; font-weight:800; color:var(--azul2); cursor:pointer; }
   .correos .correos-buscar { margin:6px 0; }
   /* v6.0 · Cómo se manda el reporte + mandarlo desde el correo propio */
@@ -675,7 +677,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
 </div>
 
 <script>
-  /* PRESENTISMO v6.0 (elegir: lo manda el sistema o desde mi correo Gmail/Outlook/celular) · v5.9.1 (lista única de correos, nada pre-tildado) · v5.9 (correos para tildar desde Correos Apps + contador de cupo) · v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
+  /* PRESENTISMO v6.1 (correos 🔒 obligatorios del servicio + opcionales de "Correos Apps"; envío manual: Gmail/Outlook en PC, compartir/correo en celular) · v6.0 (elegir: lo manda el sistema o desde mi correo Gmail/Outlook/celular) · v5.9.1 (lista única de correos, nada pre-tildado) · v5.9 (correos para tildar desde Correos Apps + contador de cupo) · v5.7 (cola sin señal + envío sin duplicados) · base v5.0 — App instalable + Teoría (Contratados / Requeridos / Francos) vs Realidad (Presentes) + Desglose */
   var D = null;
   var S = { clave: '', nombre: '', servicio: null, turno: null, dot: null, servicios: [], todos: false, motivo: '', rol: 'Supervisor', perfil: '', perfilTexto: '', accesoTotal: false, sinServicios: false };
   var bSup = null, bSer = null, formListo = false, pedidoDot = 0, ultimoEstado = null, sinGuardar = false;
@@ -847,6 +849,8 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
         if (!D) { D = d; iniciarLogin(); return; }
         D.hoy = d.hoy; D.fechaMin = d.fechaMin; D.turnos = d.turnos; D.obsMin = d.obsMin;
         D.motivosSobrante = d.motivosSobrante; D.motivosNoCompensan = d.motivosNoCompensan; D.rolesFirma = d.rolesFirma;
+        D.correos = d.correos; D.correosAuto = d.correosAuto;   // v6.1 · listas de correos siempre al día
+        if (typeof d.cupo === 'number') D.cupo = d.cupo;
         if ($('fecha')) { $('fecha').max = D.hoy; $('fecha').min = D.fechaMin; }
         // Lista de nombres: se rehace solo si cambió y la persona todavía no empezó a escribir su clave
         if (cambioLista) {
@@ -1525,6 +1529,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     S.accesoTotal = !!r.accesoTotal;
     S.sinServicios = !!r.sinServicios || (!S.servicios.length && !S.accesoTotal);
     S.dotaciones = r.dotaciones || {}; S.emails = r.emails || [];
+    S.correosServicio = r.correosServicio || null;   // v6.1 · correos OBLIGATORIOS por servicio (llegan al ingresar)
     if (r.hoy && D && r.hoy > (D.hoy || '')) D.hoy = r.hoy;
     try { localStorage.setItem('ultimoSupervisor', r.nombre); } catch (e) {}
     $('hdrSup').textContent = r.nombre;
@@ -1718,66 +1723,94 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
      ------------------------------------------------------------ */
   function claveCorreos() { return 'presentismo_correos_' + sinAcentos(S.servicio || ''); }
 
+  /* v6.1 · Correos OBLIGATORIOS del servicio (solapa SERVICIOS): siempre van, no se pueden destildar. */
+  function correosObligatorios() {
+    var mapa = S.correosServicio || D.correosServicio || {}, srv = S.servicio || '';
+    var l = mapa[srv];
+    if (!l) {
+      var k = sinAcentos(srv).replace(/\s+/g, ' ').trim();
+      Object.keys(mapa).some(function (n) { if (sinAcentos(n).replace(/\s+/g, ' ').trim() === k) { l = mapa[n]; return true; } return false; });
+    }
+    var vistos = {}, res = [];
+    (l || []).concat((D.correosAuto || []).map(function (e) { return { email: e, nombre: e, rol: 'Siempre' }; })).forEach(function (c) {
+      var e = String(c.email || '').trim().toLowerCase();
+      if (!e || vistos[e]) return; vistos[e] = true;
+      res.push({ email: e, nombre: c.nombre || e, rol: c.rol || '' });
+    });
+    return res;
+  }
+
   function pintarCorreos() {
-    // v5.9.1 · Una sola lista (sin "sugeridos"): nada viene tildado; se recuerda lo tildado la última vez en cada servicio
+    // v6.1 · Obligatorios (servicio) tildados y bloqueados + opcionales de la solapa "Correos Apps"
     var caja = $('correosBox');
     if (!caja) {
       caja = document.createElement('div'); caja.id = 'correosBox'; caja.className = 'correos';
       $('revDup').parentNode.insertBefore(caja, $('revDup'));
     }
     caja.replaceChildren();
-    var h = document.createElement('h3'); h.textContent = '✉️ ¿A quién le mandás este reporte?'; caja.appendChild(h);
-    var aviso = document.createElement('div'); aviso.className = 'msg aviso correos-aviso';
-    aviso.textContent = '📣 Estás enviando un reporte de tu servicio ' + (S.servicio || '') + ', turno ' + (S.turno || '') +
-      '. Tildá a quién se lo mandás (supervisor, coordinador, RRHH…). Si querés una copia para vos, tildate también.';
-    caja.appendChild(aviso);
-    var fijos = (D.correosAuto || []).slice();
-    if (fijos.length) {
-      var p = document.createElement('p'); p.className = 'ayuda'; p.textContent = 'Siempre lo reciben: ' + fijos.join(', ') + '.';
-      caja.appendChild(p);
+    var h = document.createElement('h3'); h.textContent = '✉️ ¿A quién le llega este reporte?'; caja.appendChild(h);
+
+    var fila = function (c, fijo, marcado, extra) {
+      var l = document.createElement('label'); l.className = 'correo' + (fijo ? ' fijo' : '');
+      var ch = document.createElement('input'); ch.type = 'checkbox'; ch.value = c.email;
+      ch.checked = fijo || marcado; ch.disabled = !!fijo;
+      if (fijo) { ch.setAttribute('data-fijo', '1'); ch.title = 'Obligatorio: no se puede quitar'; }
+      else ch.onchange = contarCorreos;
+      var t = document.createElement('span');
+      t.textContent = (fijo ? '🔒 ' : '') + (c.nombre || c.email) + (extra || '');
+      var s = document.createElement('small'); s.textContent = [c.rol || c.sector || '', c.nombre && c.nombre !== c.email ? c.email : ''].filter(Boolean).join(' · ');
+      t.appendChild(document.createElement('br')); t.appendChild(s);
+      l.appendChild(ch); l.appendChild(t);
+      return l;
+    };
+
+    // 1) Obligatorios
+    var oblig = correosObligatorios();
+    var t1 = document.createElement('div'); t1.className = 'correos-sector'; t1.textContent = '📌 Lo reciben siempre (automático, no se pueden quitar)';
+    caja.appendChild(t1);
+    if (oblig.length) oblig.forEach(function (c) { caja.appendChild(fila(c, true)); });
+    else {
+      var sinO = document.createElement('p'); sinO.className = 'ayuda';
+      sinO.textContent = (S.correosServicio || D.correosServicio) ? 'Este servicio no tiene correos cargados en la planilla.' : 'Los correos obligatorios se ven después de volver a ingresar con señal. Igual el sistema se los manda siempre.';
+      caja.appendChild(sinO);
     }
-    if (!D.correos) {
-      var sin = document.createElement('p'); sin.className = 'ayuda';
-      sin.textContent = 'La lista de correos se carga cuando hay señal. El reporte igual se guarda.';
-      caja.appendChild(sin);
-    }
+
+    // 2) Opcionales (solapa "Correos Apps"), sin repetir los obligatorios
+    var yaEstan = {}; oblig.forEach(function (c) { yaEstan[c.email] = true; });
     var mios = (S.emails || []).map(function (e) { return String(e).toLowerCase(); });
     var esMio = function (c) { return mios.indexOf(c.email.toLowerCase()) >= 0; };
-    // Primero vos; después ordenados por sector y nombre
-    var lista = (D.correos || []).slice().sort(function (a, b) {
-      return (esMio(b) - esMio(a)) || (a.sector + a.nombre).localeCompare(b.sector + b.nombre);
-    });
+    var lista = (D.correos || []).filter(function (c) { return c && c.email && !yaEstan[String(c.email).toLowerCase()]; })
+      .sort(function (a, b) { return (esMio(b) - esMio(a)) || (String(a.sector) + a.nombre).localeCompare(String(b.sector) + b.nombre); });
     var guardado = null;
     try { guardado = JSON.parse(localStorage.getItem(claveCorreos()) || 'null'); } catch (e) {}
     var tildado = function (c) { return !!guardado && guardado.indexOf(c.email.toLowerCase()) >= 0; };
 
-    if (lista.length > 8) {
-      var b = document.createElement('input'); b.type = 'search'; b.placeholder = '🔎 Buscar nombre o sector…'; b.className = 'correos-buscar';
-      b.oninput = function () {
-        var q = sinAcentos(b.value.trim());
-        Array.prototype.forEach.call(caja.querySelectorAll('label.correo'), function (l) { l.classList.toggle('oculto', !!q && sinAcentos(l.textContent).indexOf(q) < 0); });
-      };
-      caja.appendChild(b);
+    if (lista.length) {
+      var det = document.createElement('details'); det.className = 'correos-otros';
+      var hayTild = lista.some(tildado); if (hayTild) det.open = true;
+      var sum = document.createElement('summary'); sum.textContent = '➕ Agregar otros correos (opcional)'; det.appendChild(sum);
+      var ay = document.createElement('p'); ay.className = 'ayuda'; ay.textContent = 'Tildá solo si querés que también le llegue a alguien más. Si querés una copia para vos, tildate.';
+      det.appendChild(ay);
+      if (lista.length > 8) {
+        var b = document.createElement('input'); b.type = 'search'; b.placeholder = '🔎 Buscar nombre o sector…'; b.className = 'correos-buscar';
+        b.oninput = function () {
+          var q = sinAcentos(b.value.trim());
+          Array.prototype.forEach.call(det.querySelectorAll('label.correo'), function (l) { l.classList.toggle('oculto', !!q && sinAcentos(l.textContent).indexOf(q) < 0); });
+        };
+        det.appendChild(b);
+      }
+      lista.forEach(function (c) { det.appendChild(fila(c, false, tildado(c), esMio(c) ? ' (vos · copia para vos)' : '')); });
+      caja.appendChild(det);
     }
-    lista.forEach(function (c) {
-      var l = document.createElement('label'); l.className = 'correo';
-      var ch = document.createElement('input'); ch.type = 'checkbox'; ch.value = c.email; ch.checked = tildado(c);
-      ch.onchange = contarCorreos;
-      var t = document.createElement('span');
-      t.textContent = (c.nombre || c.email) + (esMio(c) ? ' (vos · copia para vos)' : '');
-      var s = document.createElement('small'); s.textContent = c.sector || '';
-      t.appendChild(document.createElement('br')); t.appendChild(s);
-      l.appendChild(ch); l.appendChild(t);
-      caja.appendChild(l);
-    });
     var cont = document.createElement('div'); cont.id = 'correosCont'; cont.className = 'control neutro';
     caja.appendChild(cont);
     contarCorreos();
   }
 
+  /** Solo los OPCIONALES tildados (los obligatorios los agrega el servidor siempre). */
   function correosElegidos() {
     var caja = $('correosBox'); if (!caja) return [];
-    var l = Array.prototype.filter.call(caja.querySelectorAll('label.correo input'), function (x) { return x.checked; })
+    var l = Array.prototype.filter.call(caja.querySelectorAll('label.correo input'), function (x) { return x.checked && !x.disabled; })
       .map(function (x) { return x.value; });
     try { localStorage.setItem(claveCorreos(), JSON.stringify(l.map(function (e) { return e.toLowerCase(); }))); } catch (e) {}
     return l;
@@ -1785,18 +1818,19 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
 
   function contarCorreos() {
     var cont = $('correosCont'); if (!cont) return;
-    var tild = $('correosBox').querySelectorAll('label.correo input:checked').length;
+    var tild = $('correosBox').querySelectorAll('label.correo input:checked:not([disabled])').length;
+    var fijos = $('correosBox').querySelectorAll('label.correo input[data-fijo]').length;
     var yo = typeof modoCorreo === 'function' && modoCorreo() === 'yo';
-    var usa = (D.correosAuto || []).length + (yo ? 0 : tild);
+    var usa = fijos + (yo ? 0 : tild);
     var quedan = typeof D.cupo === 'number' ? D.cupo : null;
     cont.replaceChildren();
     var bt = document.createElement('b');
-    bt.textContent = '📊 El sistema usa ' + usa + ' correo' + (usa === 1 ? '' : 's') + ' del cupo' + (yo && tild ? ' (a los ' + tild + ' tildados se lo mandás vos)' : '');
+    bt.textContent = '📊 El sistema usa ' + usa + ' correo' + (usa === 1 ? '' : 's') + ' del cupo' + (yo && tild ? ' (a los ' + tild + ' opcionales se lo mandás vos)' : '');
     var sm = document.createElement('small');
     sm.textContent = quedan === null ? 'Cupo de hoy: se ve cuando hay señal.' : 'Quedan ' + quedan + ' correos para hoy en todo el sistema.';
     cont.appendChild(bt); cont.appendChild(sm);
     cont.className = 'control ' + (quedan !== null && usa > quedan ? 'mal' : (quedan !== null && quedan < 100 ? 'ambar' : 'neutro'));
-    if (quedan !== null && usa > quedan) sm.textContent += ' No alcanza: elegí "Lo mando yo desde mi correo".';
+    if (quedan !== null && usa > quedan) sm.textContent += ' No alcanza: destildá los opcionales o elegí "Lo mando yo desde mi correo".';
   }
   /* ============================================================
      v6.0 · ¿CÓMO SE MANDA EL REPORTE?
@@ -1828,8 +1862,8 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     }
     box.replaceChildren();
     var m = modoCorreo();
-    [['sistema', '🤖 Lo manda el sistema', 'Llega con el formato de siempre a los que tildes.'],
-     ['yo', '📧 Lo mando yo desde mi correo', 'Se abre Gmail / Outlook con el reporte armado. Vos elegís a quién.']].forEach(function (o) {
+    [['sistema', '🤖 Lo manda el sistema', 'Llega con el formato de siempre a los 🔒 obligatorios y a los que tildes.'],
+     ['yo', '📧 Lo mando yo desde mi correo', 'Los 🔒 obligatorios igual lo reciben del sistema. A los opcionales se lo mandás vos.']].forEach(function (o) {
       var b = document.createElement('button'); b.type = 'button';
       b.className = 'modo-op' + (m === o[0] ? ' sel' : '');
       b.setAttribute('aria-pressed', m === o[0] ? 'true' : 'false');
@@ -1843,8 +1877,8 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     var ayuda = $('modoAyuda');
     if (!ayuda) { ayuda = document.createElement('p'); ayuda.id = 'modoAyuda'; ayuda.className = 'ayuda'; box.parentNode.insertBefore(ayuda, box.nextSibling); }
     ayuda.textContent = m === 'yo'
-      ? '👇 Tildá a quién se lo vas a mandar: sus correos quedan cargados cuando se abra tu correo.'
-      : '👇 Tildá a quién se lo manda el sistema.';
+      ? '👇 Los 🔒 obligatorios lo reciben solos. Si tildás opcionales, sus correos quedan cargados cuando se abra tu correo.'
+      : '👇 Los 🔒 obligatorios lo reciben solos. Podés sumar opcionales tildándolos.';
   }
   /** Lo que va al servidor: en modo "yo" el sistema no manda a los tildados (solo a las AUTOMÁTICAS). */
   function correosParaSistema(vista) {
@@ -1895,36 +1929,7 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     }
     return '';
   }
-  function escH(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
-  /** HTML para pegar en Gmail / Outlook (estilos en línea, tabla de 600 px: se ve bien en PC y celular). */
-  function htmlDelReporte(r) {
-    var col = { mal: ['#fdecea', '#b42318'], ambar: ['#fff4e0', '#9a5b00'], ok: ['#e8f6ee', '#157a3d'] };
-    var filas = r.filas.map(function (f, i) {
-      var tono = col[tonoFila(f)];
-      var bg = tono ? tono[0] : (i % 2 ? '#f6f8fb' : '#ffffff');
-      var fg = tono ? tono[1] : '#1d2733';
-      var celdas = f.c.map(function (x, j) {
-        var ult = j === f.c.length - 1 && f.c.length > 1;
-        return '<td style="padding:9px 12px;border-bottom:1px solid #e3e8ef;font-size:14px;color:' + fg + ';' +
-          (ult ? 'text-align:right;font-weight:700;' + (String(x).length < 18 ? 'white-space:nowrap;' : '') : (j === 0 ? 'font-weight:600;' : '')) + '">' + escH(x) + '</td>';
-      }).join('');
-      return '<tr style="background:' + bg + ';">' + celdas + '</tr>';
-    }).join('');
-    return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;border:1px solid #d5dde8;border-radius:10px;overflow:hidden;">' +
-      '<div style="background:#1f4e79;color:#ffffff;padding:14px 18px;">' +
-        '<div style="font-size:12px;letter-spacing:1px;opacity:.85;">☀️ LOS SOLES INTERNACIONAL S.A. · PRESENTISMO</div>' +
-        '<div style="font-size:20px;font-weight:700;margin-top:4px;">' + escH(r.servicio) + '</div>' +
-        '<div style="font-size:14px;margin-top:6px;">' +
-          '<span style="background:#ffffff;color:#1f4e79;border-radius:12px;padding:3px 10px;font-weight:700;margin-right:6px;">Turno ' + escH(r.turno) + '</span>' +
-          (r.fecha ? '<span style="background:#2e6aa3;color:#ffffff;border-radius:12px;padding:3px 10px;">📅 ' + escH(r.fecha) + '</span>' : '') +
-        '</div></div>' +
-      '<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">' + filas + '</table>' +
-      (r.obs ? '<div style="padding:12px 18px;border-top:1px solid #e3e8ef;font-size:14px;color:#1d2733;"><b>📝 Observaciones:</b> ' + escH(r.obs) + '</div>' : '') +
-      '<div style="padding:10px 18px;background:#f6f8fb;font-size:12px;color:#5b6676;">' +
-        (r.firma ? '✍️ Firma: <b>' + escH(r.firma) + '</b> · ' : '') + 'Enviado desde la app Presentismo</div>' +
-    '</div>';
-  }
   /** Texto simple prolijo (para el cuerpo cuando no se puede pegar con formato). */
   function textoDelReporte(r, max) {
     var L = [];
@@ -1942,140 +1947,85 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     if (r.firma) L.push('✍️ Firma: ' + r.firma);
     L.push('Enviado desde la app Presentismo');
     var s = L.join('\n');
-    if (max && s.length > max) s = s.slice(0, max - 30) + '\n… (ver imagen / reporte completo)';
+    if (max && s.length > max) s = s.slice(0, max - 30) + '\n… (reporte recortado)';
     return s;
   }
-  /** Imagen PNG del reporte (para compartir desde el celular). Se dibuja sin librerías. */
-  function imagenDelReporte(r) {
-    return new Promise(function (ok) {
-      var W = 1080, P = 48, esc = 1;
-      var c = document.createElement('canvas'), g = c.getContext('2d');
-      var fuente = function (px, peso) { return (peso || 'normal') + ' ' + px + 'px Arial, Helvetica, sans-serif'; };
-      var cortar = function (txt, ancho, f) {
-        g.font = f; var pal = String(txt).split(' '), l = [], a = '';
-        pal.forEach(function (p) { var t = a ? a + ' ' + p : p; if (g.measureText(t).width > ancho && a) { l.push(a); a = p; } else a = t; });
-        if (a) l.push(a); return l.length ? l : [''];
-      };
-      // Calcular alto
-      var filasL = r.filas.map(function (f) {
-        var izq = f.c.length > 1 ? f.c.slice(0, -1).join(' · ') : f.c[0], der = f.c.length > 1 ? f.c[f.c.length - 1] : '';
-        g.font = fuente(34, 'bold'); var wd = der ? g.measureText(der).width + 24 : 0;
-        if (wd > (W - 2 * P) * 0.45) { izq = izq + ': ' + der; der = ''; wd = 0; }
-        var li = cortar(izq, W - 2 * P - 40 - wd, fuente(32, '600'));
-        return { li: li, der: der, tono: tonoFila(f), h: Math.max(76, 28 + li.length * 42) };
-      });
-      var obsL = r.obs ? cortar('📝 Observaciones: ' + r.obs, W - 2 * P - 40, fuente(30)) : [];
-      var H = 250 + filasL.reduce(function (a, f) { return a + f.h; }, 0) + (obsL.length ? obsL.length * 40 + 50 : 0) + 110;
-      c.width = W * esc; c.height = H * esc;
-      // Fondo
-      g.fillStyle = '#eef2f7'; g.fillRect(0, 0, W, H);
-      g.fillStyle = '#ffffff'; g.fillRect(24, 24, W - 48, H - 48);
-      // Encabezado
-      g.fillStyle = '#1f4e79'; g.fillRect(24, 24, W - 48, 210);
-      g.fillStyle = '#cfe0f1'; g.font = fuente(26, 'bold'); g.fillText('☀️ LOS SOLES INTERNACIONAL S.A. · PRESENTISMO', P + 8, 80);
-      g.fillStyle = '#ffffff'; g.font = fuente(46, 'bold');
-      var ts = cortar(r.servicio, W - 2 * P - 16, fuente(46, 'bold'))[0]; g.fillText(ts, P + 8, 140);
-      var px = P + 8, pill = function (txt, bg, fg) {
-        g.font = fuente(28, 'bold'); var w = g.measureText(txt).width + 40;
-        g.fillStyle = bg; g.beginPath();
-        if (g.roundRect) g.roundRect(px, 162, w, 50, 25); else g.rect(px, 162, w, 50);
-        g.fill(); g.fillStyle = fg; g.fillText(txt, px + 20, 197); px += w + 14;
-      };
-      pill('Turno ' + r.turno, '#ffffff', '#1f4e79');
-      if (r.fecha) pill('📅 ' + r.fecha, '#2e6aa3', '#ffffff');
-      // Filas
-      var y = 234, col = { mal: ['#fdecea', '#b42318'], ambar: ['#fff4e0', '#9a5b00'], ok: ['#e8f6ee', '#157a3d'] };
-      filasL.forEach(function (f, i) {
-        var tn = col[f.tono];
-        g.fillStyle = tn ? tn[0] : (i % 2 ? '#f6f8fb' : '#ffffff'); g.fillRect(24, y, W - 48, f.h);
-        g.fillStyle = '#e3e8ef'; g.fillRect(24, y + f.h - 2, W - 48, 2);
-        var fg = tn ? tn[1] : '#1d2733';
-        g.fillStyle = fg; g.font = fuente(32, '600');
-        var y0 = y + (f.h - f.li.length * 42) / 2 + 32;
-        f.li.forEach(function (l, k) { g.fillText(l, P + 12, y0 + k * 42); });
-        if (f.der) { g.font = fuente(34, 'bold'); g.textAlign = 'right'; g.fillText(f.der, W - P - 12, y + f.h / 2 + 12); g.textAlign = 'left'; }
-        y += f.h;
-      });
-      if (obsL.length) {
-        y += 24; g.fillStyle = '#1d2733'; g.font = fuente(30);
-        obsL.forEach(function (l) { y += 40; g.fillText(l, P + 12, y); }); y += 10;
-      }
-      g.fillStyle = '#f6f8fb'; g.fillRect(24, H - 110, W - 48, 86);
-      g.fillStyle = '#5b6676'; g.font = fuente(26);
-      g.fillText((r.firma ? '✍️ Firma: ' + r.firma + ' · ' : '') + 'Enviado desde la app Presentismo', P + 12, H - 58);
-      c.toBlob(function (b) { ok(b); }, 'image/png');
-    });
-  }
-
-  /* ---------- Copiar con formato y abrir el correo ---------- */
-  function copiarReporte(r) {
-    var html = htmlDelReporte(r), txt = textoDelReporte(r);
-    var viejo = function () {
-      try {
-        var d = document.createElement('div'); d.contentEditable = 'true'; d.innerHTML = html;
-        d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;'; document.body.appendChild(d);
-        var rg = document.createRange(); rg.selectNodeContents(d);
-        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
-        var ok = document.execCommand('copy'); sel.removeAllRanges(); d.remove(); return ok;
-      } catch (e) { return false; }
-    };
-    if (navigator.clipboard && window.ClipboardItem) {
-      return navigator.clipboard.write([new ClipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([txt], { type: 'text/plain' })
-      })]).then(function () { return true; }).catch(function () { return viejo(); });
-    }
-    return Promise.resolve(viejo());
-  }
+  /* ---------- v6.1 · Abrir el correo propio con el reporte cargado ----------
+     PC:      📧 Gmail (cuenta del supervisor, reporte ya escrito en el cuerpo)
+              📨 Outlook (programa instalado en la PC, vía mailto:)
+     Celular: 📤 Compartir (menú nativo del teléfono: Gmail, Outlook, etc.)
+              ✉️ App de correo del teléfono con destinatarios y reporte cargados
+     ------------------------------------------------------------ */
   function copiarTexto(t) {
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function () { return true; }).catch(function () { return false; });
     return Promise.resolve(false);
   }
+  /** Cuenta de Google con la que se abre Gmail: la del supervisor (corporativa primero). */
+  function cuentaGmail() {
+    var l = (S.emails || []).map(function (e) { return String(e).trim().toLowerCase(); }).filter(function (e) { return /@/.test(e); });
+    var corp = l.filter(function (e) { return /@lossolesint\.com\.ar$/.test(e); })[0];
+    return corp || l[0] || '';
+  }
+  /** Abre un enlace mailto: sin salir de la app (lo toma el programa de correo predeterminado). */
+  function abrirMailto(to, asunto, cuerpo) {
+    var url = 'mailto:' + encodeURIComponent(to).replace(/%2C/g, ',').replace(/%40/g, '@') +
+      '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+    var a = document.createElement('a'); a.href = url; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
   function abrirCorreo(tipo) {
     var r = datosDelReporte();
-    var to = r.para.join(','), su = encodeURIComponent(r.asunto);
+    var to = r.para.join(',');
     var aviso = $('miCorreoAviso');
     var decir = function (t, cls) { if (aviso) { aviso.className = 'msg ' + (cls || 'ok'); aviso.textContent = t; aviso.classList.remove('oculto'); } };
+    var ayudaOutlook = $('miCorreoOutlookWeb'); if (ayudaOutlook) ayudaOutlook.classList.add('oculto');
+
     if (tipo === 'compartir') {
-      // Celular: se comparte la IMAGEN del reporte; los correos tildados quedan copiados para pegarlos en "Para".
+      // Celular: menú "Compartir" del teléfono (elegís Gmail, Outlook…). Los correos opcionales quedan copiados para pegarlos en "Para".
       var listo = to ? copiarTexto(r.para.join(', ')) : Promise.resolve(false);
       return listo.then(function (copiados) {
-        return imagenDelReporte(r).then(function (blob) {
-          var f = new File([blob], 'Presentismo ' + r.servicio.replace(/[\\/:*?"<>|]/g, '') + ' ' + r.turno + '.png', { type: 'image/png' });
-          var datos = { title: r.asunto, text: r.asunto + '\n\n' + textoDelReporte(r, 1500), files: [f] };
-          if (navigator.canShare && navigator.canShare({ files: [f] })) {
-            if (copiados) decir('📋 Los correos que tildaste ya están copiados: en "Para", mantené apretado y tocá "Pegar".');
-            return navigator.share(datos).catch(function () {});
-          }
-          abrirCorreo('mailto');
-        });
+        var datos = { title: r.asunto, text: r.asunto + '\n\n' + textoDelReporte(r) };
+        if (navigator.share) {
+          if (copiados) decir('📋 Los correos que tildaste ya están copiados: en "Para", mantené apretado y tocá "Pegar".');
+          return navigator.share(datos).catch(function () {});
+        }
+        abrirCorreo('mailto');
       });
     }
     if (tipo === 'mailto') {
-      var cuerpo = encodeURIComponent(textoDelReporte(r, 1600));
-      location.href = 'mailto:' + encodeURIComponent(to).replace(/%2C/g, ',').replace(/%40/g, '@') + '?subject=' + su + '&body=' + cuerpo;
+      abrirMailto(to, r.asunto, textoDelReporte(r, 1600));
+      decir('Se abrió tu correo con el reporte cargado. Revisalo y tocá Enviar.');
       return;
     }
-    if (tipo === 'imagen') {
-      return imagenDelReporte(r).then(function (blob) {
-        var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-        a.download = 'Presentismo ' + r.servicio.replace(/[\\/:*?"<>|]/g, '') + ' ' + r.turno + '.png';
-        document.body.appendChild(a); a.click(); a.remove();
-        decir('⬇️ Imagen descargada: adjuntala en el correo.');
-      });
+    if (tipo === 'outlook') {
+      // Outlook de la PC: mailto: lo abre el programa instalado (si Outlook es el correo predeterminado de Windows).
+      var seAbrio = false;
+      var alSalir = function () { seAbrio = true; };
+      window.addEventListener('blur', alSalir, { once: true });
+      abrirMailto(to, r.asunto, textoDelReporte(r, 1600));
+      decir('📨 Abriendo Outlook… Cuando aparezca el correo, revisalo y tocá Enviar.');
+      setTimeout(function () {
+        window.removeEventListener('blur', alSalir);
+        if (seAbrio || document.visibilityState === 'hidden') return;
+        decir('⚠️ Outlook no se abrió en esta PC. Pedí a Sistemas que pongan Outlook como "aplicación de correo predeterminada" de Windows. Mientras tanto, usá "Abrir en Gmail" o el botón de abajo.', 'aviso');
+        if (ayudaOutlook) ayudaOutlook.classList.remove('oculto');
+      }, 2500);
+      return;
     }
-    // PC: se copia el reporte CON FORMATO y se abre el correo; la persona pega con Ctrl+V.
-    var ventana = window.open('about:blank', '_blank');
-    copiarReporte(r).then(function (copiado) {
-      var cuerpo = copiado ? '' : encodeURIComponent(textoDelReporte(r, 1600));
-      var url = tipo === 'outlook'
-        ? 'https://outlook.office.com/mail/deeplink/compose?to=' + encodeURIComponent(to) + '&subject=' + su + '&body=' + cuerpo
-        : 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(to) + '&su=' + su + '&body=' + cuerpo;
-      if (ventana) ventana.location.href = url; else window.open(url, '_blank');
-      decir(copiado
-        ? '📋 El reporte ya está copiado CON FORMATO. En el correo que se abrió: hacé clic en el cuerpo del mensaje y apretá Ctrl + V. Después tocá Enviar.'
-        : 'Se abrió el correo con el reporte en texto. Revisalo y tocá Enviar.');
-    });
+    if (tipo === 'outlookweb') {
+      window.open('https://outlook.office.com/mail/deeplink/compose?to=' + encodeURIComponent(to) +
+        '&subject=' + encodeURIComponent(r.asunto) + '&body=' + encodeURIComponent(textoDelReporte(r, 1600)), '_blank', 'noopener');
+      return;
+    }
+    // Gmail en la PC: se abre "Redactar" en la cuenta del supervisor con destinatarios, asunto y reporte ya escritos.
+    var cuenta = cuentaGmail();
+    var url = 'https://mail.google.com/mail/' + (cuenta ? '?authuser=' + encodeURIComponent(cuenta) + '&' : '?') +
+      'view=cm&fs=1&tf=1&to=' + encodeURIComponent(to) + '&su=' + encodeURIComponent(r.asunto) + '&body=' + encodeURIComponent(textoDelReporte(r, 1800));
+    var w = window.open(url, '_blank', 'noopener');
+    if (!w) location.href = url;
+    decir(cuenta
+      ? '📧 Se abrió Gmail con tu cuenta ' + cuenta + ' y el reporte ya escrito. Revisalo y tocá Enviar. (Si te pide entrar, entrá con esa cuenta y el correo aparece solo.)'
+      : '📧 Se abrió Gmail con el reporte ya escrito. Revisalo y tocá Enviar.');
   }
   function pintarMiCorreo() {
     var vOk = $('vOk'); if (!vOk || !S.ultimoReporte) return;
@@ -2093,23 +2043,23 @@ input.mal, textarea.mal, .stepper.mal input { border-color: #c62828 !important; 
     if (yo) {
       var p = document.createElement('p'); p.className = 'ayuda';
       p.textContent = S.ultimoReporte.para.length
-        ? 'Ya quedan cargados los ' + S.ultimoReporte.para.length + ' correo(s) que tildaste. Tocá un botón:'
+        ? 'Ya quedan cargados los ' + S.ultimoReporte.para.length + ' correo(s) opcionales que tildaste. Tocá un botón:'
         : 'Tocá un botón y elegí a quién mandárselo:';
       box.appendChild(p);
     }
     var movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    var boton = function (txt, tipo, cls) {
+    var boton = function (txt, tipo, cls, id) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || ''); b.textContent = txt;
-      b.onclick = function () { abrirCorreo(tipo); }; box.appendChild(b);
+      if (id) b.id = id;
+      b.onclick = function () { abrirCorreo(tipo); }; box.appendChild(b); return b;
     };
     if (movil) {
-      boton('📤 Abrir mi correo con el reporte (imagen)', 'compartir', yo ? '' : 'sec');
-      boton('✉️ Correo en texto, con los destinatarios ya puestos', 'mailto', 'sec');
+      boton('📤 Compartir el reporte (Gmail, Outlook…)', 'compartir', yo ? '' : 'sec');
+      boton('✉️ Abrir mi app de correo con el reporte', 'mailto', 'sec');
     } else {
       boton('📧 Abrir en Gmail', 'gmail', yo ? '' : 'sec');
-      boton('📨 Abrir en Outlook', 'outlook', 'sec');
-      boton('🖥️ Programa de correo de la PC', 'mailto', 'sec');
-      boton('⬇️ Descargar el reporte como imagen', 'imagen', 'sec');
+      boton('📨 Abrir en Outlook (programa de la PC)', 'outlook', 'sec');
+      boton('🌐 Abrir Outlook en la web', 'outlookweb', 'sec oculto', 'miCorreoOutlookWeb');
     }
     var av = document.createElement('div'); av.id = 'miCorreoAviso'; av.className = 'msg ok oculto'; box.appendChild(av);
   }
